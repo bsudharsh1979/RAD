@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { EvidenceBadge } from "@/components/EvidenceBadge";
+import { notebookHref } from "@/lib/paths";
+import { NotesBar } from "@/components/NotesBar";
 
 export default function LearnInner() {
   const sp = useSearchParams();
@@ -89,7 +91,7 @@ export default function LearnInner() {
                   digital twin
                 </Link>{" "}
                 and source{" "}
-                <Link className="text-[#76b900]" href={`/notebooks/${current.notebook_file}`}>
+                <Link className="text-[#76b900]" href={notebookHref(current.notebook_file, current.cell_index)}>
                   {current.notebook_file} · cell {current.cell_index}
                 </Link>
                 .
@@ -135,6 +137,7 @@ export default function LearnInner() {
               </Link>
             )}
             {st === "MASTERY_UPDATE" && <p>Viewing is not mastery. Quiz, predict, and teach-back update scores.</p>}
+            <NotesBar targetType="concept" targetId={current.id} />
           </div>
         </article>
       )}
@@ -147,7 +150,7 @@ function Teach({ conceptId }: { conceptId: string }) {
   const [r, setR] = useState<any>(null);
   return (
     <div>
-      <textarea className="w-full rounded bg-[#0b0d0c] p-2" placeholder="Let me explain…" value={t} onChange={(e) => setT(e.target.value)} />
+      <textarea className="field" placeholder="Let me explain…" value={t} onChange={(e) => setT(e.target.value)} />
       <button
         className="mt-2 rounded bg-[#76b900] px-3 py-1 text-black"
         onClick={async () =>
@@ -156,7 +159,23 @@ function Teach({ conceptId }: { conceptId: string }) {
       >
         Submit teach-back
       </button>
-      {r && <pre className="mt-3 overflow-auto text-xs text-[#9aa89a]">{JSON.stringify(r, null, 2)}</pre>}
+      {r && (
+        <div className="mt-3 space-y-1 text-sm">
+          <p>
+            <strong>Correctly explained:</strong> {(r.correctly_explained || []).join(", ") || "—"}
+          </p>
+          <p>
+            <strong>Missing:</strong> {(r.missing || []).join(", ") || "—"}
+          </p>
+          <p>
+            <strong>Confused:</strong> {(r.confused_concepts || []).join(", ") || "—"}
+          </p>
+          <p>
+            <strong>Suggested:</strong> {r.suggested}
+          </p>
+          <p>Quality {r.quality}</p>
+        </div>
+      )}
     </div>
   );
 }

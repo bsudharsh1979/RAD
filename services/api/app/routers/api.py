@@ -590,7 +590,18 @@ def attempt(body: AttemptIn, user: User = Depends(learner), db: Session = Depend
     q = db.get(Question, body.question_id)
     if not q:
         raise HTTPException(404)
+    prior = (
+        db.query(QuestionAttempt)
+        .filter(QuestionAttempt.user_id == user.id, QuestionAttempt.question_id == q.id)
+        .count()
+    )
     correct, feedback = grade(q, body.given)
+    if not correct and prior >= 1:
+        feedback["socratic"] = False
+        feedback["try_again"] = False
+        feedback["canonical_answer"] = q.answer
+        feedback["simple_correction"] = q.explanation
+        feedback["missing_distinction"] = q.explanation
     aid = str(uuid.uuid4())
     db.add(
         QuestionAttempt(
@@ -797,8 +808,24 @@ async def exp_import(
 
 @router.get("/experiments")
 def experiments(user: User = Depends(learner), db: Session = Depends(get_db)):
-    exps = db.query(Experiment).filter(Experiment.user_id == user.id).all()
-    return [{"id": e.id, "name": e.name, "kind": e.kind, "created_at": e.created_at.isoformat()} for e in exps]
+    exps = db.query(Experiment).filter(Experiment.user_id == user.id).order_by(Experiment.created_at.desc()).all()
+    out = []
+    for e in exps:
+        runs = db.query(BenchmarkRun).filter(BenchmarkRun.experiment_id == e.id).all()
+        latest = runs[-1] if runs else None
+        out.append(
+            {
+                "id": e.id,
+                "name": e.name,
+                "kind": e.kind,
+                "created_at": e.created_at.isoformat(),
+                "run_ids": [r.id for r in runs],
+                "latest_run_id": latest.id if latest else None,
+                "normalized": latest.normalized if latest else {},
+                "evidence_type": latest.evidence_type if latest else "ACTUAL_RUN",
+            }
+        )
+    return out
 
 
 class CompareIn(BaseModel):
@@ -926,6 +953,99 @@ def assessment(db: Session = Depends(get_db)):
         "pass_rule": 3,
         "questions": [_public_q(q) for q in qs],
         "twin": "assessment-agent",
+        "steps": [
+            "understand",
+            "hypothesis",
+            "choose_features",
+            "run_simulation",
+            "inspect",
+            "import_optional",
+            "recommend",
+            "defend",
+        ],
+        "constraints": {
+            "image_syntax": "`path/to/img.png`",
+            "code_fence": "```",
+            "toxicity_reward": "1 - toxicity",
+            "model": "TheBloke/Llama-2-13B-chat-GPTQ",
+        },
+    }
+
+
+class DefendIn(BaseModel):
+    hypothesis: str = ""
+    defense: str = ""
+    features: dict[str, bool] = Field(default_factory=dict)
+    twin_state: dict | None = None
+
+
+@router.post("/assessment/defend")
+def assessment_defend(body: DefendIn, user: User = Depends(learner), db: Session = Depends(get_db)):
+    n = sum(1 for v in body.features.values() if v)
+    blob = f"{body.hypothesis} {body.defense}".lower()
+    checks = {
+        "at_least_three_features": n >= 3,
+        "mentions_inverted_toxicity": ("1 -" in blob or "1-" in blob or "inverted" in blob or ("reward" in blob and "toxic" in blob)),
+        "mentions_user_as_tool": ("ask-for-input" in blob or "ask for input" in blob or "user as a tool" in blob),
+        "mentions_13b_not_70b": ("13b" in blob or "13 b" in blob),
+    }
+    missing = [k for k, v in checks.items() if not v]
+    quality = max(0.0, 1.0 - 0.2 * len(missing))
+    apply_event(db, user.id, "c-assess", "design", quality >= 0.55, quality=quality, note="assessment-defend")
+    user.last_resume_json = {
+        "text": "Last time you were defending an assessment agent design. Weakest area was naming the inverted toxicity reward and the 13B GPTQ grader."
+        if "mentions_inverted_toxicity" in missing or "mentions_13b_not_70b" in missing
+        else "Last time you defended an assessment agent that meets the ≥3/5 pass rule.",
+        "action": "/assessment",
+    }
+    db.commit()
+    return {
+        "implemented_count": n,
+        "pass_rule": 3,
+        "would_pass_feature_count": n >= 3,
+        "correctly_explained": [k for k, v in checks.items() if v],
+        "missing": missing,
+        "quality": round(quality, 3),
+        "evidence_type": "TUTOR_INTERPRETATION",
+        "note": "Grading reasoning, not a leaked notebook solution.",
+        "twin_evidence": (body.twin_state or {}).get("evidence_type"),
+    }
+
+
+class DiagCompleteIn(BaseModel):
+    answered: int = 0
+    correct: int = 0
+
+
+@router.post("/diagnostic/complete")
+def diagnostic_complete(body: DiagCompleteIn, user: User = Depends(learner), db: Session = Depends(get_db)):
+    hm = heatmap(db, user.id)
+    weak = sorted(hm, key=lambda x: x["score"])[:3]
+    user.last_resume_json = {
+        "text": (
+            f"You finished the diagnostic ({body.correct}/{body.answered} marked correct). "
+            + (
+                f"Start with {weak[0]['name']}."
+                if weak
+                else "Open notebook 1 and the pipeline twin."
+            )
+        ),
+        "action": f"/learn?concept={weak[0]['concept_id']}" if weak else "/learn",
+    }
+    db.commit()
+    states = db.query(MasteryState).filter(MasteryState.user_id == user.id).all()
+    scored = sorted(states, key=lambda s: s.score)
+    concepts = {c.id: c for c in db.query(Concept).all()}
+    weak_ui = [
+        {"id": s.concept_id, "name": concepts.get(s.concept_id).name if concepts.get(s.concept_id) else s.concept_id, "score": s.score}
+        for s in scored[:5]
+    ]
+    return {
+        "heatmap": hm,
+        "correct": body.correct,
+        "answered": body.answered,
+        "plan": _thirty(db, user, weak_ui),
+        "resume": user.last_resume_json,
     }
 
 

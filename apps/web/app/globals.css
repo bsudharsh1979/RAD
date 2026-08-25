@@ -45,5 +45,21 @@ html.light body {
 }
 
 .panel {
-  @apply rounded-xl border border-[#2a322c] bg-[#141816];
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+}
+
+html.light aside,
+html.light header {
+  background: var(--panel);
 }

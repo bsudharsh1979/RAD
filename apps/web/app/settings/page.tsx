@@ -10,10 +10,10 @@ export default function SettingsPage() {
   const [cost, setCost] = useState<any>(null);
   const [integ, setInteg] = useState<any>(null);
   useEffect(() => {
-    api("/me").then(setMe);
-    api("/providers").then(setProv);
-    api("/cost").then(setCost);
-    api("/integrity").then(setInteg);
+    api<any>("/me").then(setMe);
+    api<any>("/providers").then(setProv);
+    api<any>("/cost").then(setCost);
+    api<any>("/integrity").then(setInteg);
   }, []);
   if (!me || !prov) return <p>Loading settings…</p>;
   return (
@@ -79,6 +79,9 @@ export default function SettingsPage() {
           </p>
         </div>
       )}
+      <p className="text-sm" style={{ color: "var(--muted)" }}>
+        Changing tutor engine never happens silently. If OpenAI/NIM is offline, the API discloses Demo fallback.
+      </p>
       <Link href="/" className="text-[#76b900]">
         Back to home
       </Link>

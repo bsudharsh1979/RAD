@@ -59,6 +59,8 @@ def test_teachback_and_review_and_assessment_and_resume():
     assert c.get("/api/assessment").json()["pass_rule"] == 3
     home = c.get("/api/home").json()
     assert home["resume"]
+    d = c.post("/api/assessment/defend", json={"hypothesis": "3 features", "defense": "need ask-for-input and 13B", "features": {"memory": True}}).json()
+    assert d["would_pass_feature_count"] is False
 
 
 def test_provider_failure_disclosed():

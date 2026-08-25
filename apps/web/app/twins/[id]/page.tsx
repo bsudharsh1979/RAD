@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { EvidenceBadge } from "@/components/EvidenceBadge";
 import { TwinViz } from "@/components/TwinViz";
+import { notebookHref } from "@/lib/paths";
+import { NotesBar } from "@/components/NotesBar";
 
 export default function TwinPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +19,9 @@ export default function TwinPage() {
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
+    setState(null);
+    setLocked(false);
+    setPredId(null);
     api<any[]>("/twins").then((rows) => {
       const t = rows.find((x) => x.id === id);
       setMeta(t);
@@ -30,9 +36,15 @@ export default function TwinPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-3xl">{meta.name}</h1>
-      <p className="text-[#9aa89a]">{meta.summary}</p>
+      <p style={{ color: "var(--muted)" }}>{meta.summary}</p>
       <EvidenceBadge type="SIMULATED_RESULT" />
-      <p className="text-sm">Source notebook: {meta.notebook_file}. Predict before running when the lesson asks.</p>
+      <p className="text-sm">
+        Source:{" "}
+        <Link className="text-[#76b900]" href={notebookHref(meta.notebook_file)}>
+          {meta.notebook_file}
+        </Link>
+        . Predict before running.
+      </p>
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="panel space-y-3 p-4">
           {meta.controls.map((c: any) => (
@@ -47,7 +59,7 @@ export default function TwinPage() {
                 />
               ) : c.type === "enum" ? (
                 <select
-                  className="mt-1 w-full rounded bg-[#0b0d0c] p-1"
+                  className="field mt-1"
                   value={params[c.key]}
                   onChange={(e) => setParams({ ...params, [c.key]: isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value) })}
                 >
@@ -58,7 +70,7 @@ export default function TwinPage() {
                   ))}
                 </select>
               ) : c.type === "string" ? (
-                <input className="mt-1 w-full rounded bg-[#0b0d0c] p-1" value={params[c.key] || ""} onChange={(e) => setParams({ ...params, [c.key]: e.target.value })} />
+                <input className="field mt-1" value={params[c.key] || ""} onChange={(e) => setParams({ ...params, [c.key]: e.target.value })} />
               ) : (
                 <input
                   type="range"
@@ -70,10 +82,12 @@ export default function TwinPage() {
                   onChange={(e) => setParams({ ...params, [c.key]: Number(e.target.value) })}
                 />
               )}
-              <span className="ml-2 text-[#9aa89a]">{String(params[c.key])}</span>
+              <span className="ml-2" style={{ color: "var(--muted)" }}>
+                {String(params[c.key])}
+              </span>
             </label>
           ))}
-          <textarea className="w-full rounded bg-[#0b0d0c] p-2 text-sm" placeholder="Your prediction" value={pred} onChange={(e) => setPred(e.target.value)} />
+          <textarea className="field" placeholder="Your prediction" value={pred} onChange={(e) => setPred(e.target.value)} />
           <button
             className="w-full rounded border border-[#76b900] px-3 py-2"
             onClick={async () => {
@@ -100,17 +114,24 @@ export default function TwinPage() {
           >
             Run simulation
           </button>
-          <p className="text-xs text-[#9aa89a]">Outcome hidden until you lock a prediction (active learning).</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            Outcome hidden until you lock a prediction (active learning).
+          </p>
         </div>
         <div className="space-y-3">
           <TwinViz scenario={id} params={params} state={state} />
           {state && (
             <div className="panel p-4">
               <EvidenceBadge type={state.evidence_type} />
+              <h2 className="mt-2 text-sm font-medium">Your prediction vs simulated observation</h2>
+              <p className="text-sm">You predicted: {pred || "(empty)"}</p>
               <p className="mt-2 text-sm">{state.teaching}</p>
-              <pre className="mt-3 max-h-80 overflow-auto text-xs text-[#9aa89a]">{JSON.stringify(state, null, 2)}</pre>
+              <pre className="mt-3 max-h-80 overflow-auto text-xs" style={{ color: "var(--muted)" }}>
+                {JSON.stringify(state, null, 2)}
+              </pre>
             </div>
           )}
+          <NotesBar targetType="twin" targetId={String(id)} />
         </div>
       </div>
     </div>

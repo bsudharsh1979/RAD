@@ -9,7 +9,7 @@ export default function SourceDetail() {
   const { id } = useParams<{ id: string }>();
   const [d, setD] = useState<any>(null);
   useEffect(() => {
-    api(`/sources/${id}`).then(setD);
+    api(`/sources/${encodeURIComponent(decodeURIComponent(id))}`).then(setD);
   }, [id]);
   if (!d) return <p>Loading source…</p>;
   return (

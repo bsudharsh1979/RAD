@@ -117,3 +117,23 @@ def test_concept_map():
     r = client.get("/api/concepts").json()
     assert len(r["nodes"]) >= 40
     assert r["edges"]
+
+
+def test_diagnostic_complete_and_assessment_defend():
+    diag = client.get("/api/diagnostic").json()
+    q = diag["questions"][0]
+    client.post("/api/questions/attempt", json={"question_id": q["id"], "given": q["options"][0] if q.get("options") else "x"})
+    done = client.post("/api/diagnostic/complete", json={"answered": 1, "correct": 0}).json()
+    assert "plan" in done
+    assert "heatmap" in done
+    d = client.post(
+        "/api/assessment/defend",
+        json={
+            "hypothesis": "Use memory, image, toxicity with Ask-For-Input Tool",
+            "defense": "Pass at 3 of 5. Toxicity reward is 1 - toxicity. Grader is 13B GPTQ.",
+            "features": {"memory": True, "image": True, "toxicity": True, "code": False, "emotion": False},
+        },
+    ).json()
+    assert d["would_pass_feature_count"] is True
+    assert d["evidence_type"] == "TUTOR_INTERPRETATION"
+    assert "at_least_three_features" in d["correctly_explained"]

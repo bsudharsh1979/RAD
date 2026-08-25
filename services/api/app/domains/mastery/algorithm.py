@@ -114,10 +114,14 @@ def apply_event(
 
 
 def heatmap(db: Session, user_id: str) -> list[dict[str, Any]]:
+    from app.db.models import Concept
+
     rows = db.query(MasteryState).filter(MasteryState.user_id == user_id).all()
+    names = {c.id: c.name for c in db.query(Concept).all()}
     return [
         {
             "concept_id": r.concept_id,
+            "name": names.get(r.concept_id, r.concept_id),
             "score": r.score,
             "confidence": r.confidence,
             "next_review": r.next_review.isoformat() if r.next_review else None,

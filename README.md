@@ -23,7 +23,7 @@ chmod +x scripts/dev.sh
 
 Open http://localhost:3000
 
-First screen asks **which APIs you want**. Choose **Demo** to stay offline.
+First screen asks **which APIs you want**. Choose **Demo** to stay offline. Then take the adaptive diagnostic — viewing content is not mastery.
 
 `docker compose up` is the PostgreSQL + pgvector path when Docker is available.
 

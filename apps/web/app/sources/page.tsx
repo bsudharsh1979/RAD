@@ -26,7 +26,7 @@ export default function SourcesPage() {
       </form>
       {hits.map((h) => (
         <div key={h.span_id} className="panel p-3 text-sm">
-          <Link className="text-[#76b900]" href={`/notebooks/${h.file}`}>
+          <Link className="text-[#76b900]" href={`/notebooks/${encodeURIComponent(h.file)}?cell=${h.cell_index}`}>
             {h.file} · cell {h.cell_index}
           </Link>
           <p className="text-[#9aa89a]">{h.excerpt.slice(0, 240)}</p>
@@ -35,7 +35,7 @@ export default function SourcesPage() {
       <ul className="space-y-2">
         {rows.map((s) => (
           <li key={s.id}>
-            <Link href={`/sources/${s.file}`} className="text-[#76b900]">
+            <Link href={`/sources/${encodeURIComponent(s.file)}`} className="text-[#76b900]">
               {s.file}
             </Link>{" "}
             · {s.type} · {s.title}

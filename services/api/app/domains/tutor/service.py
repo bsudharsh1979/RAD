@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models import EvidenceType, ProviderTrace, TutorMessage, TutorMode, TutorSession, User
+from app.db.models import EvidenceType, ProviderTrace, Question, TutorMessage, TutorMode, TutorSession, User
 from app.domains.providers.base import TutorRequest
 from app.domains.providers.registry import PerplexityResearchProvider, get_provider
 from app.domains.retrieval.search import hybrid_search, match_concepts
@@ -134,6 +134,18 @@ def tutor_turn(
         )
 
     msg_id = str(uuid.uuid4())
+    quiz = None
+    if intent == "quiz":
+        qrow = db.query(Question).filter(Question.qtype == "mcq").first()
+        if qrow:
+            quiz = {
+                "id": qrow.id,
+                "stem": qrow.stem,
+                "options": qrow.options,
+                "concept_id": qrow.concept_id,
+                "source": {"file": qrow.source_file, "cell_index": qrow.source_cell},
+            }
+            text = text + "\n\nQuiz (do not reveal yet): " + qrow.stem
     db.add(
         TutorMessage(
             id=msg_id,
@@ -159,6 +171,7 @@ def tutor_turn(
         "evidence_type": evidence,
         "provider": provider_name,
         "how_served": trace,
+        "quiz": quiz,
     }
 
 

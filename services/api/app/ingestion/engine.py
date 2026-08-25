@@ -310,10 +310,12 @@ def _cell_commentary(
     filename: str, index: int, cell_type: str, src: str, flags: list[str]
 ) -> dict[str, str]:
     if cell_type != "code":
+        heading = next((ln[2:].strip() for ln in src.splitlines() if ln.startswith("# ")), None)
+        numbered = "\n".join(f"{n+1:03d}  {line}" for n, line in enumerate(src.splitlines()[:80]))
         return {
             "plain_english": "Expository markdown from the NVIDIA notebook.",
-            "line_by_line": "",
-            "why_exists": "Carries the course narrative, objectives, or wrap-up.",
+            "line_by_line": numbered or src[:400],
+            "why_exists": heading or "Carries the course narrative, objectives, or wrap-up.",
             "what_should_happen": "The learner reads; nothing is executed.",
             "how_to_verify": "Match headings against the source notebook.",
             "common_failure": "Treating a diagram caption as an experimental measurement.",

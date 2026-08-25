@@ -17,7 +17,7 @@ export default function NotebooksPage() {
         {rows.map((n) => (
           <Link key={n.id} href={`/notebooks/${encodeURIComponent(n.filename)}`} className="panel block p-4 hover:border-[#76b900]">
             <div className="text-xs text-[#76b900]">Lab {n.order}</div>
-            <h2 className="text-lg">{n.title}</h2>
+            <h2 className="text-lg">{String(n.title).replace(/^\d+:\s*/, "")}</h2>
             <p className="mt-2 text-sm text-[#9aa89a]">{n.purpose}</p>
             <p className="mt-1 text-xs">{n.n_cells} cells</p>
           </Link>

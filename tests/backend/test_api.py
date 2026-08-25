@@ -119,6 +119,19 @@ def test_concept_map():
     assert r["edges"]
 
 
+def test_hybrid_search_prefers_intro_for_pipeline():
+    from app.domains.retrieval.search import hybrid_search
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        hits = hybrid_search(db, "Explain HuggingFace pipelines using the course notebooks.")
+        assert hits
+        assert hits[0]["file"] == "01_llm_intro.ipynb"
+    finally:
+        db.close()
+
+
 def test_diagnostic_complete_and_assessment_defend():
     diag = client.get("/api/diagnostic").json()
     q = diag["questions"][0]

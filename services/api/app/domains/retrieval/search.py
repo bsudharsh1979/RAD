@@ -6,6 +6,18 @@ from app.db.models import Concept, SourceSpan
 from app.domains.retrieval.embeddings import cosine, hash_embedding, lexical_score
 
 
+FILE_ALIASES = {
+    "01_llm_intro.ipynb": "pipeline huggingface fill-mask tokenizer model preprocess postprocess",
+    "02_llm_intake.ipynb": "token embedding attention q k v bert position type",
+    "03_encoder_task.ipynb": "mlm qa span sequence classification zero-shot",
+    "04_seq2seq.ipynb": "t5 flan encoder-decoder cross-attention",
+    "05_multimodal.ipynb": "whisper vit blip clip spectrogram caption",
+    "06_textgen.ipynb": "gpt decoder llama quantization gptq codegen",
+    "07_stateful_models.ipynb": "langchain memory rag agent react",
+    "08_assessment.ipynb": "assessment toxicity emotion agent",
+}
+
+
 def hybrid_search(
     db: Session,
     query: str,
@@ -22,15 +34,21 @@ def hybrid_search(
     spans = q.all()
     qvec = hash_embedding(query)
     scored: list[tuple[float, SourceSpan]] = []
+    qlow = query.lower()
     for sp in spans:
+        aliases = FILE_ALIASES.get(sp.file or "", "")
         body = " ".join(
-            x for x in [sp.heading, sp.body, sp.code or "", sp.stored_output or ""] if x
+            x
+            for x in [sp.file, aliases, sp.heading, sp.body, sp.code or "", sp.stored_output or ""]
+            if x
         )
         if not body.strip():
             continue
         lex = lexical_score(query, body)
         sem = cosine(qvec, sp.embedding or []) if sp.embedding else 0.0
         score = 0.62 * lex + 0.38 * sem
+        if aliases and any(tok in qlow for tok in aliases.split() if len(tok) > 3):
+            score += 0.08
         if score > 0:
             scored.append((score, sp))
     scored.sort(key=lambda t: t[0], reverse=True)

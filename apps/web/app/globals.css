@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nv: #76b900;
+  --bg: #0b0d0c;
+  --panel: #141816;
+  --line: #2a322c;
+  --ink: #e8eee6;
+  --muted: #9aa89a;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+*:focus-visible {
+  outline: 2px solid #76b900;
+  outline-offset: 2px;
+}
+
+html.light {
+  --bg: #f3f6f0;
+  --panel: #ffffff;
+  --line: #d5ddd0;
+  --ink: #121412;
+  --muted: #4d5a4d;
+}
+
+html.light body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.panel {
+  @apply rounded-xl border border-[#2a322c] bg-[#141816];
+}

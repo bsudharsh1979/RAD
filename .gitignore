@@ -1,0 +1,16 @@
+# Logs
+*.log
+.next
+node_modules
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+data/*.db
+data/*.db-wal
+data/*.db-shm
+.env
+.venv
+dist
+playwright-report
+test-results

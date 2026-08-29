@@ -48,16 +48,21 @@ max_containers = int(os.environ.get("MODAL_MAX_CONTAINERS", "1"))
     max_containers=max_containers,
     scaledown_window=300,
 )
-@modal.concurrent(max_inputs=100)
-@modal.web_server(port=3000)
+@modal.web_server(port=3000, startup_timeout=120)
 def web():
     import os as _os
+    import subprocess
     from pathlib import Path as P
 
-    _os.environ.setdefault("PORT", "3000")
-    _os.environ.setdefault("HOSTNAME", "0.0.0.0")
+    # Next.js binds to HOSTNAME; Modal containers already set this to a
+    # non-routable name, so setdefault() would leave the server unreachable.
+    _os.environ["PORT"] = "3000"
+    _os.environ["HOSTNAME"] = "0.0.0.0"
+    _os.environ.setdefault("NODE_ENV", "production")
     root = P("/web/.next/standalone")
     candidates = [root / "server.js", root / "apps" / "web" / "server.js"]
     server = next((p for p in candidates if p.exists()), root / "server.js")
-    _os.chdir(str(server.parent))
-    _os.execvp("node", ["node", str(server)])
+    if not server.exists():
+        raise FileNotFoundError(f"Next standalone server missing at {server}")
+    # Keep the Modal worker process alive; execvp drops the HTTP proxy.
+    subprocess.Popen(["node", str(server)], cwd=str(server.parent))

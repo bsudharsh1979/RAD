@@ -89,6 +89,11 @@ def match_concepts(db: Session, query: str, limit: int = 5) -> list[Concept]:
             words = [w for w in name.split() if len(w) > 3]
             if words and all(w in qlow for w in words):
                 s += 0.25
+        if "[mask]" in qlow or "fill-mask" in qlow:
+            if c.slug in {"huggingface-pipeline", "fill-mask-task", "pipeline-preprocess", "pipeline-forward", "pipeline-postprocess"}:
+                s += 0.45
+            if c.slug == "huggingface-pipeline":
+                s += 0.2
         ranked.append((s, c))
     ranked.sort(key=lambda t: t[0], reverse=True)
     return [c for s, c in ranked[:limit] if s > 0.02]

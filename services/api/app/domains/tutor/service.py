@@ -305,7 +305,7 @@ def _teach_compose(content, intent, hits, concepts, mode, depth, research_meta) 
             try_bits.append(f"run the {lead.twin_id} twin (SIMULATED_RESULT, not a GPU measurement)")
         if lead.notebook_file:
             try_bits.append(f"open {lead.notebook_file} cell {lead.cell_index}")
-        lines.extend(["Try this", "Then ".join(try_bits) + ".", ""])
+        lines.extend(["Try this", " ".join(try_bits) + ".", ""])
     if research_meta:
         lines.extend(
             [

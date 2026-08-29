@@ -418,6 +418,15 @@ def test_tutor_strips_thinking_trace():
     assert _looks_like_lesson("What's happening — Pipeline\nFrom the notebook\ncell 14")
 
 
+def test_tutor_mask_question_is_pipeline():
+    r = client.post(
+        "/api/tutor",
+        json={"content": "What actually happens between the sentence I type and the [MASK] guess?"},
+    ).json()
+    assert "huggingface pipeline" in r["text"].lower() or "fill-mask" in r["text"].lower()
+    assert "what's happening" in r["text"].lower()
+
+
 def test_tutor_teaches_pipeline_mechanism():
     r = client.post("/api/tutor", json={"content": "What actually happens inside a HuggingFace pipeline?"}).json()
     text = r["text"].lower()

@@ -409,6 +409,15 @@ def test_topics_catalog_is_ten_stories():
     assert client.get("/api/topics/not-a-topic").status_code == 404
 
 
+def test_tutor_strips_thinking_trace():
+    from app.domains.tutor.service import _looks_like_lesson, _student_text
+
+    raw = "Here's a thinking process:\n1. Analyze User Input\nWhat's happening — HuggingFace Pipeline\nThe process."
+    assert _student_text(raw).startswith("What's happening")
+    assert not _looks_like_lesson(raw)
+    assert _looks_like_lesson("What's happening — Pipeline\nFrom the notebook\ncell 14")
+
+
 def test_tutor_teaches_pipeline_mechanism():
     r = client.post("/api/tutor", json={"content": "What actually happens inside a HuggingFace pipeline?"}).json()
     text = r["text"].lower()

@@ -29,6 +29,7 @@ class NvidiaNIMProvider(TutorModelProvider):
             "messages": messages,
             "max_tokens": req.max_tokens,
             "temperature": 0.2,
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
         }
         with httpx.Client(timeout=180.0) as client:
             r = client.post(url, json=payload, headers=headers)
@@ -36,7 +37,8 @@ class NvidiaNIMProvider(TutorModelProvider):
             data = r.json()
         choice = (data.get("choices") or [{}])[0]
         msg = choice.get("message") or {}
-        text = (msg.get("content") or msg.get("reasoning_content") or "").strip()
+        # Never show chain-of-thought / reasoning_content to the learner.
+        text = (msg.get("content") or "").strip()
         usage = data.get("usage") or {}
         ms = (time.perf_counter() - t0) * 1000
         return TutorResponse(

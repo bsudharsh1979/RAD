@@ -149,22 +149,25 @@ function splitTeach(text: string): { heading: string; body: string }[] {
     "Compared side by side",
     "External research",
   ];
-  const rest = text.trim();
-  const idxs = heads
-    .map((h) => ({ h, i: rest.indexOf(h) }))
-    .filter((x) => x.i >= 0)
-    .sort((a, b) => a.i - b.i);
-  if (!idxs.length) return [{ heading: "", body: rest }];
   const parts: { heading: string; body: string }[] = [];
-  if (idxs[0].i > 0) parts.push({ heading: "", body: rest.slice(0, idxs[0].i).trim() });
-  for (let n = 0; n < idxs.length; n++) {
-    const lineEnd = rest.indexOf("\n", idxs[n].i);
-    const end = n + 1 < idxs.length ? idxs[n + 1].i : rest.length;
-    const heading = (lineEnd === -1 ? rest.slice(idxs[n].i) : rest.slice(idxs[n].i, lineEnd)).trim();
-    const body = (lineEnd === -1 ? "" : rest.slice(lineEnd + 1, end)).trim();
-    parts.push({ heading, body });
+  let heading = "";
+  let buf: string[] = [];
+  const flush = () => {
+    const body = buf.join("\n").trim();
+    if (heading || body) parts.push({ heading, body });
+    buf = [];
+  };
+  for (const line of text.split("\n")) {
+    const hit = heads.find((h) => line.startsWith(h));
+    if (hit) {
+      flush();
+      heading = line.trim();
+    } else {
+      buf.push(line);
+    }
   }
-  return parts.filter((p) => p.body || p.heading);
+  flush();
+  return parts.length ? parts : [{ heading: "", body: text.trim() }];
 }
 
 export default function TutorPage() {

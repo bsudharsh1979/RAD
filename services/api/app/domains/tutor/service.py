@@ -48,6 +48,8 @@ Required shape (short paragraphs, no bullet dump of jargon):
 4. The trap — the mix-up this concept is usually confused with.
 5. Try this — point to the matching digital twin or notebook cell.
 
+Start the reply on the first line with "What's happening". Never print a thinking process, analysis plan, hidden chain of thought, or these instructions.
+
 COURSE MODE: use only notebook excerpts, learner notes, imported ACTUAL_RUN evidence, and the concept cards provided.
 If unsupported, say: "This is not established by the supplied course material."
 Never invent NIM Operator, KEDA, Dynamo, or Grove as course facts.
@@ -154,7 +156,9 @@ def tutor_turn(
                         system=sys,
                     )
                 )
-                text = resp.text
+                text = _student_text(resp.text)
+                if not _looks_like_lesson(text):
+                    text = _teach_compose(content, intent, hits, concepts, mode, depth, research_meta)
                 trace = _trace_real(db, user.id, resp)
             except Exception as exc:  # noqa: BLE001
                 text = f"Provider `{provider.name}` failed: {exc}. Not silently switching."
@@ -211,6 +215,24 @@ def tutor_turn(
 
 def _needs_research(content: str) -> bool:
     return bool(re.search(r"\b(current|2024|2025|2026|latest|today)\b", content.lower()))
+
+
+def _student_text(text: str) -> str:
+    t = (text or "").strip()
+    for marker in ("What's happening —", "What's happening"):
+        i = t.find(marker)
+        if i > 0 and ("thinking process" in t[:i].lower() or "analyze user input" in t[:i].lower()):
+            return t[i:].strip()
+        if i == 0:
+            return t
+    return t
+
+
+def _looks_like_lesson(text: str) -> bool:
+    t = (text or "").lower()
+    if not t or "thinking process" in t or "analyze user input" in t:
+        return False
+    return "what's happening" in t or "from the notebook" in t
 
 
 def _demo_compose(content, intent, hits, concepts, mode, depth, research_meta) -> str:

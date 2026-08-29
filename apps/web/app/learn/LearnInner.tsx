@@ -1,181 +1,123 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { EvidenceBadge } from "@/components/EvidenceBadge";
-import { notebookHref } from "@/lib/paths";
-import { NotesBar } from "@/components/NotesBar";
+import { notebookHref, topicHref, twinHref } from "@/lib/paths";
+
+type Topic = {
+  id: string;
+  order: number;
+  title: string;
+  hook: string;
+  promise: string;
+  minutes: number;
+  notebook: string;
+  twin: string;
+  ask: string;
+  concepts?: { id: string; name: string; definition: string }[];
+};
+
+type ConceptDetail = {
+  concept: {
+    id: string;
+    name: string;
+    definition: string;
+    analogy: string;
+    school: string;
+    engineer: string;
+    research: string;
+    notebook_file: string;
+    cell_index: number;
+    twin_id: string;
+  };
+};
 
 export default function LearnInner() {
   const sp = useSearchParams();
   const cid = sp.get("concept");
-  const [graph, setGraph] = useState<any>(null);
-  const [detail, setDetail] = useState<any>(null);
-  const [step, setStep] = useState(0);
-  const [pred, setPred] = useState("");
+  const [topics, setTopics] = useState<Topic[] | null>(null);
+  const [detail, setDetail] = useState<ConceptDetail | null>(null);
 
   useEffect(() => {
-    api("/concepts").then(setGraph);
+    api<Topic[]>("/topics").then(setTopics);
   }, []);
   useEffect(() => {
-    if (cid) api(`/concepts/${cid}`).then(setDetail);
+    if (cid) api<ConceptDetail>(`/concepts/${cid}`).then(setDetail);
     else setDetail(null);
   }, [cid]);
 
-  const current = useMemo(() => {
-    if (detail) return detail.concept;
-    return graph?.nodes?.[0];
-  }, [detail, graph]);
+  if (!topics) return <p>Loading topics…</p>;
 
-  if (!graph) return <p>Loading lessons…</p>;
-  const steps = detail?.lesson || [
-    { name: "EXPLAIN" },
-    { name: "VISUALIZE" },
-    { name: "PREDICT" },
-    { name: "EXPERIMENT" },
-    { name: "OBSERVE" },
-    { name: "EXPLAIN_BACK" },
-    { name: "DIAGNOSE" },
-    { name: "PRACTICE" },
-    { name: "MASTERY_UPDATE" },
-  ];
-  const st = steps[step]?.name || "EXPLAIN";
+  if (cid && detail?.concept) {
+    const c = detail.concept;
+    const parent = topics.find((t) => t.concepts?.some((x) => x.id === c.id));
+    return (
+      <article className="mx-auto max-w-3xl space-y-5">
+        {parent && (
+          <Link href={topicHref(parent.id)} className="text-sm" style={{ color: "var(--muted)" }}>
+            ← {parent.title}
+          </Link>
+        )}
+        <p className="text-xs uppercase tracking-[0.2em] text-[#76b900]">Concept</p>
+        <h1 className="text-4xl font-semibold">{c.name}</h1>
+        <section className="panel space-y-4 p-6">
+          <Block title="What's happening" body={c.engineer || c.definition} />
+          <Block title="A picture that sticks" body={c.analogy || c.school} />
+          <Block title="School version" body={c.school} />
+          <Block title="The trap" body={c.research} />
+        </section>
+        <div className="flex flex-wrap gap-3">
+          <Link className="rounded-lg bg-[#76b900] px-4 py-2 text-black" href={notebookHref(c.notebook_file, c.cell_index)}>
+            Open the lecture
+          </Link>
+          {c.twin_id && (
+            <Link className="rounded-lg border px-4 py-2" href={twinHref(c.twin_id)}>
+              Try the twin
+            </Link>
+          )}
+          <Link className="rounded-lg border px-4 py-2" href={`/tutor?q=${encodeURIComponent(`Teach me ${c.name} as a mechanism, not a definition.`)}`}>
+            Ask the tutor
+          </Link>
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-      <aside className="panel max-h-[80vh] overflow-auto p-3">
-        <h2 className="mb-2 text-sm uppercase tracking-wide text-[#9aa89a]">Concepts</h2>
-        {graph.nodes.map((n: any) => (
-          <Link
-            key={n.id}
-            href={`/learn?concept=${n.id}`}
-            className={`block rounded px-2 py-1 text-sm ${cid === n.id ? "bg-[#1c2618] text-[#76b900]" : "hover:bg-[#171c18]"}`}
-          >
-            {n.name}
+    <div className="space-y-6">
+      <header className="max-w-3xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#76b900]">Learn by topic</p>
+        <h1 className="mt-2 text-4xl font-semibold">Pick a story, not a syllabus dump.</h1>
+        <p className="mt-3" style={{ color: "var(--muted)" }}>
+          Each track is five ideas, one notebook, one twin. Finish when you can explain the moving parts out loud.
+        </p>
+      </header>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {topics.map((t) => (
+          <Link key={t.id} href={topicHref(t.id)} className="panel block p-5 hover:border-[#76b900]">
+            <p className="text-xs uppercase tracking-[0.15em] text-[#76b900]">
+              {String(t.order).padStart(2, "0")} · {t.minutes} min
+            </p>
+            <h2 className="mt-2 text-xl font-medium">{t.title}</h2>
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+              {t.hook}
+            </p>
+            <p className="mt-3 text-sm">Walk away able to: {t.promise}</p>
           </Link>
         ))}
-      </aside>
-      {current && (
-        <article className="space-y-4">
-          <EvidenceBadge type="COURSE_SOURCE" />
-          <h1 className="text-3xl">{current.name}</h1>
-          <p className="text-[#9aa89a]">{current.definition}</p>
-          <div className="flex flex-wrap gap-2 text-sm">
-            {steps.map((s: any, i: number) => (
-              <button
-                key={s.name}
-                className={`rounded-full px-3 py-1 ${i === step ? "bg-[#76b900] text-black" : "bg-[#1c2618]"}`}
-                onClick={() => setStep(i)}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-          <div className="panel p-5 space-y-3">
-            {st === "EXPLAIN" && (
-              <>
-                <h3>School</h3>
-                <p>{detail?.concept?.school || current.school}</p>
-                <h3>Engineer</h3>
-                <p>{detail?.concept?.engineer || current.engineer}</p>
-                <h3>Research</h3>
-                <p>{detail?.concept?.research || current.research}</p>
-              </>
-            )}
-            {st === "VISUALIZE" && (
-              <p>
-                Open the{" "}
-                <Link className="text-[#76b900]" href={`/twins/${current.twin_id || "pipeline-flow"}`}>
-                  digital twin
-                </Link>{" "}
-                and source{" "}
-                <Link className="text-[#76b900]" href={notebookHref(current.notebook_file, current.cell_index)}>
-                  {current.notebook_file} · cell {current.cell_index}
-                </Link>
-                .
-              </p>
-            )}
-            {st === "PREDICT" && (
-              <div>
-                <p className="mb-2">Lock a prediction before simulated metrics are treated as observed.</p>
-                <textarea className="w-full rounded bg-[#0b0d0c] p-2" value={pred} onChange={(e) => setPred(e.target.value)} />
-                <button
-                  className="mt-2 rounded bg-[#76b900] px-3 py-1 text-black"
-                  onClick={async () => {
-                    await api("/twins/predict", {
-                      method: "POST",
-                      body: JSON.stringify({
-                        twin_id: current.twin_id || "pipeline-flow",
-                        prompt: "lesson",
-                        predicted: { note: pred },
-                      }),
-                    });
-                    setStep(Math.min(step + 1, steps.length - 1));
-                  }}
-                >
-                  Lock prediction
-                </button>
-              </div>
-            )}
-            {st === "EXPERIMENT" && (
-              <Link className="text-[#76b900]" href={`/twins/${current.twin_id || "pipeline-flow"}`}>
-                Run the twin (SIMULATED_RESULT)
-              </Link>
-            )}
-            {st === "OBSERVE" && <p>Compare your locked prediction to the twin. Simulations are never ACTUAL_RUN.</p>}
-            {st === "EXPLAIN_BACK" && <Teach conceptId={current.id} />}
-            {st === "DIAGNOSE" && (
-              <Link href="/practice" className="text-[#76b900]">
-                Practice misconception items
-              </Link>
-            )}
-            {st === "PRACTICE" && (
-              <Link href={`/practice?concept=${current.id}`} className="text-[#76b900]">
-                Open sourced questions
-              </Link>
-            )}
-            {st === "MASTERY_UPDATE" && <p>Viewing is not mastery. Quiz, predict, and teach-back update scores.</p>}
-            <NotesBar targetType="concept" targetId={current.id} />
-          </div>
-        </article>
-      )}
+      </div>
     </div>
   );
 }
 
-function Teach({ conceptId }: { conceptId: string }) {
-  const [t, setT] = useState("");
-  const [r, setR] = useState<any>(null);
+function Block({ title, body }: { title: string; body?: string }) {
+  if (!body) return null;
   return (
     <div>
-      <textarea className="field" placeholder="Let me explain…" value={t} onChange={(e) => setT(e.target.value)} />
-      <button
-        className="mt-2 rounded bg-[#76b900] px-3 py-1 text-black"
-        onClick={async () =>
-          setR(await api("/teachback", { method: "POST", body: JSON.stringify({ concept_id: conceptId, transcript: t }) }))
-        }
-      >
-        Submit teach-back
-      </button>
-      {r && (
-        <div className="mt-3 space-y-1 text-sm">
-          <p>
-            <strong>Correctly explained:</strong> {(r.correctly_explained || []).join(", ") || "—"}
-          </p>
-          <p>
-            <strong>Missing:</strong> {(r.missing || []).join(", ") || "—"}
-          </p>
-          <p>
-            <strong>Confused:</strong> {(r.confused_concepts || []).join(", ") || "—"}
-          </p>
-          <p>
-            <strong>Suggested:</strong> {r.suggested}
-          </p>
-          <p>Quality {r.quality}</p>
-        </div>
-      )}
+      <h2 className="text-sm font-medium text-[#76b900]">{title}</h2>
+      <p className="mt-1 leading-relaxed">{body}</p>
     </div>
   );
 }

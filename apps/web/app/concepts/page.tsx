@@ -29,9 +29,9 @@ export default function ConceptsPage() {
   if (!g) return <p>Loading concept map…</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl">Concept map</h1>
+      <h1 className="text-3xl font-semibold">Concept map</h1>
       <p style={{ color: "var(--muted)" }}>
-        {g.nodes.length} concepts · {g.edges.length} relations from the NVIDIA notebooks.
+        {g.nodes.length} ideas grouped by mechanism. Open a card, then ask the tutor “what happens,” not “define.”
       </p>
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="panel overflow-auto p-4">
@@ -104,8 +104,8 @@ export default function ConceptsPage() {
                   Digital twin
                 </Link>
               )}
-              <Link className="block text-[#76b900]" href={`/practice?concept=${node.id}`}>
-                Quiz
+              <Link className="block text-[#76b900]" href={`/tutor?q=${encodeURIComponent(`Teach me ${node.name} as a mechanism.`)}`}>
+                Ask the tutor
               </Link>
               <NotesBar targetType="concept" targetId={node.id} />
             </div>

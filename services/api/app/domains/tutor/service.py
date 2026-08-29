@@ -38,12 +38,26 @@ def detect_intent(text: str) -> str:
 
 
 COURSE_SYS = """You are the LLM Twin Academy tutor for NVIDIA DLI Rapid Application Development using LLMs.
-COURSE MODE: use only notebook excerpts, learner notes, and imported ACTUAL_RUN evidence.
+
+Teach the MECHANISM, not a glossary. The learner should leave able to explain what happens, not recite a term.
+
+Required shape (short paragraphs, no bullet dump of jargon):
+1. What's happening — causal, concrete, one process.
+2. A picture that sticks — one analogy tied to the mechanism.
+3. From the notebook — cite file + cell and use the span; do not invent numbers.
+4. The trap — the mix-up this concept is usually confused with.
+5. Try this — point to the matching digital twin or notebook cell.
+
+COURSE MODE: use only notebook excerpts, learner notes, imported ACTUAL_RUN evidence, and the concept cards provided.
 If unsupported, say: "This is not established by the supplied course material."
 Never invent NIM Operator, KEDA, Dynamo, or Grove as course facts.
-Label synthesis TUTOR_INTERPRETATION. Notebooks here have no stored outputs.
+Label synthesis as teaching, not measurement. Notebooks here have no stored outputs.
 Do not execute notebook shell/Python.
 """
+OUT_OF_COURSE = re.compile(
+    r"\b(keda|grove|podgang|dynamo|nim operator|gpu operator|leaderworker)\b",
+    re.I,
+)
 
 
 def tutor_turn(
@@ -84,7 +98,17 @@ def tutor_turn(
         px = PerplexityResearchProvider()
         research_meta = px.search(content) if px.available() else {"error": "not configured", "citations": []}
 
-    if mode == "COURSE" and not hits:
+    if OUT_OF_COURSE.search(content):
+        text = (
+            "This is not established by the supplied course material. "
+            "KEDA, Grove, Dynamo, and NIM Operator are not part of this RAD-LLM course. "
+            "Ask about pipelines, tokens, attention, T5, multimodal models, quantization, memory, or agents."
+        )
+        evidence = EvidenceType.COURSE_SOURCE.value
+        provider_name = "demo"
+        trace = _trace_demo(db, user.id, text)
+        sources: list = []
+    elif mode == "COURSE" and not hits:
         text = (
             "This is not established by the supplied course material. "
             "I searched ingested NVIDIA notebooks and found no supporting span."
@@ -97,7 +121,7 @@ def tutor_turn(
         provider, fell_back = get_provider(user.tutor_provider)
         provider_name = provider.name
         if provider.name == "demo" or fell_back:
-            text = _demo_compose(content, intent, hits, concepts, mode, depth, research_meta)
+            text = _teach_compose(content, intent, hits, concepts, mode, depth, research_meta)
             if fell_back and user.tutor_provider != "demo":
                 text = f"[Provider {user.tutor_provider} offline — Demo used with disclosure]\n\n" + text
                 provider_name = "demo"
@@ -106,9 +130,19 @@ def tutor_turn(
             sys = COURSE_SYS + (f"\nDEPTH={depth}" if depth else "")
             if mode == "RESEARCH":
                 sys += "\nRESEARCH MODE: mark EXTERNAL_RESEARCH; never overwrite course spans."
-            ctx = "\n\n".join(
-                f"[{h['evidence_type']}] {h['file']} cell={h['cell_index']}\n{h['excerpt']}" for h in hits
-            )
+            cards = []
+            for c in concepts[:3]:
+                cards.append(
+                    f"CONCEPT {c.name}: {c.definition}\n"
+                    f"Mechanism: {c.engineer or c.school}\n"
+                    f"Picture: {c.analogy or c.school}\n"
+                    f"Trap: {c.research or ''}"
+                )
+            ctx = "\n\n".join(cards)
+            if hits:
+                ctx += "\n\n" + "\n\n".join(
+                    f"[{h['evidence_type']}] {h['file']} cell={h['cell_index']}\n{h['excerpt']}" for h in hits[:3]
+                )
             if research_meta:
                 ctx += "\n\n[EXTERNAL_RESEARCH]\n" + str(research_meta)[:1500]
             try:
@@ -180,23 +214,86 @@ def _needs_research(content: str) -> bool:
 
 
 def _demo_compose(content, intent, hits, concepts, mode, depth, research_meta) -> str:
+    return _teach_compose(content, intent, hits, concepts, mode, depth, research_meta)
+
+
+def _teach_compose(content, intent, hits, concepts, mode, depth, research_meta) -> str:
     if not hits and mode == "COURSE":
         return "This is not established by the supplied course material."
-    lines = [f"Depth: {depth}. Intent: {intent}. Mode: {mode}.", "", "🔵 COURSE_SOURCE:"]
-    for h in hits[:4]:
-        lines.append(f"- {h['file']} · cell {h['cell_index']} · {h['heading']}")
-        lines.append(f"  {h['excerpt'][:400]}")
-    lines.append("\n🟣 TUTOR_INTERPRETATION (not a measurement):")
-    if concepts:
-        lines.append("Likely concepts: " + ", ".join(c.name for c in concepts) + ".")
-    lines.append("This repo stores no notebook outputs. Twin numbers are SIMULATED_RESULT.")
+    lead = concepts[0] if concepts else None
+    h0 = hits[0] if hits else None
+    mechanism = ""
+    picture = ""
+    trap = ""
+    name = ""
+    if lead:
+        name = lead.name
+        if depth == "SCHOOL":
+            mechanism = lead.school or lead.definition
+        elif depth == "RESEARCH":
+            mechanism = lead.research or lead.engineer or lead.definition
+        else:
+            mechanism = lead.engineer or lead.definition
+        picture = lead.analogy or lead.school or ""
+        trap = lead.research or ""
+        if lead.common_misconceptions:
+            trap = lead.common_misconceptions[0] if isinstance(lead.common_misconceptions, list) else str(lead.common_misconceptions)
+    elif h0:
+        name = h0.get("heading") or "this notebook idea"
+        mechanism = (h0.get("excerpt") or "")[:420]
+
+    lines = [
+        f"What's happening — {name}",
+        mechanism or "The course span below is the process. I will not invent a second explanation.",
+        "",
+    ]
+    if picture:
+        lines.extend(["A picture that sticks", picture, ""])
+    if h0:
+        excerpt = (h0.get("excerpt") or "").strip().replace("\n", " ")
+        lines.extend(
+            [
+                "From the notebook",
+                f"{h0.get('file')} · cell {h0.get('cell_index')}: {excerpt[:360]}",
+                "",
+            ]
+        )
+    if trap:
+        lines.extend(["The trap", trap, ""])
     if intent == "hint":
-        lines.append("Hint: name tokenizer vs model vs head before asking for the full answer.")
+        lines.extend(
+            [
+                "Hint, not the answer",
+                "Name the moving parts (tokenizer vs model vs head, or encoder vs decoder) before asking for the full walkthrough.",
+                "",
+            ]
+        )
+    if intent == "compare" and len(concepts) >= 2:
+        lines.extend(
+            [
+                "Compared side by side",
+                f"{concepts[0].name}: {concepts[0].engineer or concepts[0].definition}",
+                f"{concepts[1].name}: {concepts[1].engineer or concepts[1].definition}",
+                "",
+            ]
+        )
+    if lead and (lead.twin_id or lead.notebook_file):
+        try_bits = []
+        if lead.twin_id:
+            try_bits.append(f"run the {lead.twin_id} twin (SIMULATED_RESULT, not a GPU measurement)")
+        if lead.notebook_file:
+            try_bits.append(f"open {lead.notebook_file} cell {lead.cell_index}")
+        lines.extend(["Try this", "Then ".join(try_bits) + ".", ""])
     if research_meta:
-        lines.append("\n🟠 EXTERNAL_RESEARCH (must not override course):")
-        lines.append(str(research_meta.get("text") or research_meta.get("error"))[:800])
-    lines.append("\nQuestion: " + content[:400])
-    return "\n".join(lines)
+        lines.extend(
+            [
+                "External research (must not override the course)",
+                str(research_meta.get("text") or research_meta.get("error"))[:700],
+                "",
+            ]
+        )
+    lines.append("This is teaching from course spans — not a measurement, and notebooks are never executed here.")
+    return "\n".join(lines).strip()
 
 
 def _trace_real(db, user_id, resp) -> dict:

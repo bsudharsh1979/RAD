@@ -21,6 +21,8 @@ type Walkthrough = {
   disclaimer?: string;
 };
 
+type Clip = { b64: string; mime: string };
+
 const DEPTH_KEY = "walkthrough-depth";
 
 export function WalkthroughPlayer({
@@ -39,11 +41,11 @@ export function WalkthroughPlayer({
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [err, setErr] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-  const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const finishTimes = useRef<number[]>([]);
-  const cacheKey = useRef<string>("");
+  const [hint, setHint] = useState<string | null>(null);
+  const [loadingVoice, setLoadingVoice] = useState(false);
+  const audioEl = useRef<HTMLAudioElement | null>(null);
+  const cache = useRef<Map<string, Clip>>(new Map());
+  const gen = useRef(0);
 
   useEffect(() => {
     const saved = localStorage.getItem(DEPTH_KEY);
@@ -52,11 +54,8 @@ export function WalkthroughPlayer({
 
   useEffect(() => {
     if (!open) return;
-    const key = `${notebookId}:${depth}`;
-    cacheKey.current = key;
     setErr(null);
-    setUnavailable(false);
-    finishTimes.current = [];
+    setHint(null);
     api<Walkthrough>(`/notebooks/${encodeURIComponent(notebookId)}/walkthrough?depth=${depth}`)
       .then((d) => {
         setData(d);
@@ -71,94 +70,123 @@ export function WalkthroughPlayer({
     if (step && onRange) onRange(step.cell_start, step.cell_end);
   }, [step, onRange]);
 
+  const prefetch = useCallback(async (text: string): Promise<Clip | null> => {
+    const hit = cache.current.get(text);
+    if (hit) return hit;
+    const r: any = await api("/voice/tts", {
+      method: "POST",
+      body: JSON.stringify({ text, provider: "auto", clip: false, language: "en" }),
+    });
+    if (r?.audio_b64) {
+      const clip = { b64: r.audio_b64 as string, mime: (r.mime as string) || "audio/mpeg" };
+      cache.current.set(text, clip);
+      return clip;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    if (!open || !step) return;
+    void prefetch(step.narration).catch(() => null);
+  }, [open, step, prefetch]);
+
   const stopVoice = useCallback(() => {
+    gen.current += 1;
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-      audioRef.current = null;
+    const el = audioEl.current;
+    if (el) {
+      el.onended = null;
+      el.onerror = null;
+      el.pause();
     }
-    utterRef.current = null;
   }, []);
 
+  const advance = useCallback(() => {
+    setIdx((i) => {
+      const last = (data?.steps.length || 1) - 1;
+      if (i >= last) {
+        setPlaying(false);
+        return i;
+      }
+      return i + 1;
+    });
+  }, [data?.steps.length]);
+
   const speak = useCallback(
-    async (text: string, onEnd: () => void) => {
-      stopVoice();
-      try {
-        const r: any = await api("/voice/tts", {
-          method: "POST",
-          body: JSON.stringify({ text, provider: "auto", clip: false, language: "en" }),
-        });
-        if (r?.audio_b64) {
-          const a = new Audio(`data:${r.mime || "audio/mpeg"};base64,${r.audio_b64}`);
-          a.playbackRate = speed;
-          a.onended = () => onEnd();
-          a.onerror = () => {
-            setUnavailable(true);
-            setPlaying(false);
-          };
-          audioRef.current = a;
-          await a.play();
+    async (text: string) => {
+      const my = ++gen.current;
+      setHint(null);
+      setLoadingVoice(true);
+      let clip: Clip | null = cache.current.get(text) || null;
+      if (!clip) {
+        try {
+          clip = await prefetch(text);
+        } catch {
+          clip = null;
+        }
+      }
+      if (my !== gen.current) return;
+      setLoadingVoice(false);
+
+      const el = audioEl.current;
+      if (clip && el) {
+        el.src = `data:${clip.mime};base64,${clip.b64}`;
+        el.playbackRate = speed;
+        el.onended = () => {
+          if (my === gen.current) advance();
+        };
+        el.onerror = () => {
+          if (my !== gen.current) return;
+          setHint("Could not play the audio file. Press Play again, or use Next.");
+          setPlaying(false);
+        };
+        try {
+          await el.play();
+          return;
+        } catch {
+          if (my !== gen.current) return;
+          setHint("Voice is cached — press Play once more (browsers block autoplay after a network wait).");
+          setPlaying(false);
           return;
         }
-      } catch {
-        /* fall through to browser voice */
       }
-      if (!window.speechSynthesis) {
-        setUnavailable(true);
+
+      if (typeof window === "undefined" || !window.speechSynthesis) {
+        setHint("No voice in this browser. Read the lecture and use Next.");
         setPlaying(false);
         return;
       }
       const u = new SpeechSynthesisUtterance(text);
       u.rate = Math.max(0.6, Math.min(1.6, 0.93 * speed));
-      const started = Date.now();
       u.onend = () => {
-        const elapsed = Date.now() - started;
-        if (elapsed < 400) {
-          finishTimes.current.push(elapsed);
-          if (finishTimes.current.filter((t) => t < 400).length >= 2) {
-            setUnavailable(true);
-            setPlaying(false);
-            stopVoice();
-            return;
-          }
-        } else {
-          finishTimes.current = [];
-        }
-        onEnd();
+        if (my === gen.current) advance();
       };
-      u.onerror = () => {
-        setUnavailable(true);
+      u.onerror = (ev) => {
+        if (my !== gen.current) return;
+        const why = (ev as SpeechSynthesisErrorEvent).error;
+        if (why === "interrupted" || why === "canceled") return;
+        setHint("Browser voice failed. Use Next, or press Play again.");
         setPlaying(false);
       };
-      utterRef.current = u;
       window.speechSynthesis.speak(u);
     },
-    [speed, stopVoice],
-  );
-
-  const go = useCallback(
-    (next: number) => {
-      if (!data) return;
-      const bounded = Math.max(0, Math.min(data.steps.length - 1, next));
-      setIdx(bounded);
-    },
-    [data],
+    [advance, prefetch, speed],
   );
 
   useEffect(() => {
-    if (!playing || !step || unavailable) return;
-    void speak(step.narration, () => {
-      if (idx < (data?.steps.length || 1) - 1) {
-        setIdx((i) => i + 1);
-      } else {
-        setPlaying(false);
-      }
-    });
+    if (!playing || !step) return;
+    void speak(step.narration);
     return () => stopVoice();
-  }, [playing, idx, step, speak, stopVoice, unavailable, data?.steps.length]);
+  }, [playing, idx, step, speak, stopVoice]);
+
+  const go = (next: number) => {
+    if (!data) return;
+    stopVoice();
+    setPlaying(false);
+    setIdx(Math.max(0, Math.min(data.steps.length - 1, next)));
+  };
 
   const toggleDepth = (d: "simple" | "expert") => {
     stopVoice();
@@ -171,18 +199,19 @@ export function WalkthroughPlayer({
 
   if (!open) {
     return (
-      <button className="rounded bg-[#76b900] px-3 py-2 text-sm text-black" onClick={() => setOpen(true)}>
+      <button className="rounded-lg bg-[#76b900] px-4 py-2 text-sm font-medium text-black" onClick={() => setOpen(true)}>
         Play audio lecture
       </button>
     );
   }
 
   return (
-    <div className="sticky bottom-3 z-20 panel p-4 shadow-lg" data-testid="walkthrough-player">
+    <div className="sticky bottom-3 z-20 panel p-5 shadow-lg" data-testid="walkthrough-player">
+      <audio ref={audioEl} preload="auto" className="hidden" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-[0.15em] text-[#76b900]">Audio lecture</p>
-          <h2 className="text-lg">{data?.title || "Loading walkthrough…"}</h2>
+          <h2 className="text-lg font-medium">{data?.title || "Loading walkthrough…"}</h2>
         </div>
         <div className="flex gap-2">
           <button
@@ -211,31 +240,32 @@ export function WalkthroughPlayer({
         </div>
       </div>
       {err && <p className="mt-2 text-sm text-amber-400">{err}</p>}
-      {unavailable && (
-        <p className="mt-2 text-sm text-amber-400">audio unavailable — step through manually</p>
-      )}
+      {hint && <p className="mt-2 text-sm text-amber-300">{hint}</p>}
+      {loadingVoice && <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>Fetching voice…</p>}
       {step && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           <p className="text-xs" style={{ color: "var(--muted)" }}>
-            {idx + 1}/{data?.steps.length} · {step.kind.replace("_", " ")} · cells {step.cell_start}–{step.cell_end} · ~
-            {step.duration_s}s
+            {idx + 1}/{data?.steps.length} · {step.kind.replace("_", " ")} · cells {step.cell_start}–{step.cell_end}
           </p>
-          <p className="text-sm leading-relaxed">{step.narration}</p>
+          <p className="text-base leading-relaxed">{step.narration}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <button className="rounded border px-2 py-1 text-xs" onClick={() => go(idx - 1)}>
+            <button className="rounded border px-3 py-1 text-sm" onClick={() => go(idx - 1)}>
               Prev
             </button>
             <button
-              className="rounded bg-[#76b900] px-3 py-1 text-xs text-black"
+              className="rounded bg-[#76b900] px-4 py-1 text-sm font-medium text-black"
               onClick={() => {
-                if (unavailable) return;
-                setPlaying((p) => !p);
-                if (playing) stopVoice();
+                if (playing) {
+                  stopVoice();
+                  setPlaying(false);
+                } else {
+                  setPlaying(true);
+                }
               }}
             >
               {playing ? "Pause" : "Play"}
             </button>
-            <button className="rounded border px-2 py-1 text-xs" onClick={() => go(idx + 1)}>
+            <button className="rounded border px-3 py-1 text-sm" onClick={() => go(idx + 1)}>
               Next
             </button>
             <label className="text-xs">
@@ -258,20 +288,16 @@ export function WalkthroughPlayer({
               <button
                 key={`${s.kind}-${i}`}
                 className={`rounded px-2 py-1 text-[11px] ${i === idx ? "bg-[#1c2618] text-[#76b900]" : "bg-[#171c18]"}`}
-                onClick={() => {
-                  stopVoice();
-                  setPlaying(false);
-                  setIdx(i);
-                }}
-                title={`${s.title} · ${s.duration_s}s`}
+                onClick={() => go(i)}
+                title={s.title}
               >
-                {s.kind === "stage" ? s.title : s.kind.replace("_", " ")} · {s.duration_s}s
+                {s.kind === "stage" ? s.title : s.kind.replace("_", " ")}
               </button>
             ))}
           </div>
           {stages.length > 0 && (
             <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Narrating this stage: cells {step.cell_start}–{step.cell_end}
+              This stage covers cells {step.cell_start}–{step.cell_end}
             </p>
           )}
         </div>

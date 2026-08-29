@@ -396,3 +396,33 @@ def test_integrity_and_misconceptions():
 def test_providers_still_demo():
     r = client.get("/api/providers").json()
     assert r["status"]["demo"] == "connected"
+
+
+def test_topics_catalog_is_ten_stories():
+    rows = client.get("/api/topics").json()
+    assert len(rows) == 10
+    assert rows[0]["id"] == "the-black-box"
+    assert rows[0]["concepts"]
+    one = client.get("/api/topics/the-black-box").json()
+    assert one["twin"] == "pipeline-flow"
+    assert any(c["id"] == "c-pipeline" for c in one["concepts"])
+    assert client.get("/api/topics/not-a-topic").status_code == 404
+
+
+def test_tutor_teaches_pipeline_mechanism():
+    r = client.post("/api/tutor", json={"content": "What actually happens inside a HuggingFace pipeline?"}).json()
+    text = r["text"].lower()
+    assert "what's happening" in text
+    assert "depth:" not in text
+    assert "likely concepts" not in text
+    assert "preprocess" in text or "tokenizer" in text or "pipeline" in text
+    assert r["sources"]
+
+
+def test_home_plan_avoids_removed_surfaces():
+    h = client.get("/api/home").json()
+    blob = " ".join(f"{p['href']} {p['title']}" for p in h["thirty_minute_plan"])
+    assert "/practice" not in blob
+    assert "/review" not in blob
+    assert "/assessment" not in blob
+    assert "/progress" not in blob

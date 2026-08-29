@@ -17,6 +17,7 @@ from app.domains.risks.catalog import RISKS
 from app.domains.tutor.service import tutor_turn
 from app.domains.twins.engine import TWIN_CATALOG, run as run_twin
 from app.domains.voice.service import transcribe_stub, voice_status
+from app.domains.topics.catalog import get_topic, list_topics
 from app.domains.walkthrough.engine import build_walkthrough
 from app.routers.api import learner, review as review_due
 from app.domains.providers.registry import PROVIDERS, VOICE, PerplexityResearchProvider
@@ -98,6 +99,56 @@ def lesson_one(lid: str, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(404, "unknown lesson")
     return {"id": row.id, "concept_id": row.concept_id, "title": row.title, "steps": row.steps}
+
+
+@router.get("/topics")
+def topics(db: Session = Depends(get_db)):
+    rows = []
+    for t in list_topics():
+        concepts = []
+        for cid in t["concept_ids"]:
+            c = db.get(Concept, cid)
+            if c:
+                concepts.append(
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "definition": c.definition,
+                        "analogy": c.analogy,
+                        "school": c.school,
+                        "engineer": c.engineer,
+                    }
+                )
+        rows.append({**t, "concepts": concepts, "concept_count": len(concepts)})
+    return rows
+
+
+@router.get("/topics/{tid}")
+def topic_one(tid: str, db: Session = Depends(get_db)):
+    t = get_topic(tid)
+    if not t:
+        raise HTTPException(404, {"error": "unknown topic", "tried": tid})
+    concepts = []
+    for cid in t["concept_ids"]:
+        c = db.get(Concept, cid)
+        if not c:
+            continue
+        concepts.append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "slug": c.slug,
+                "definition": c.definition,
+                "analogy": c.analogy,
+                "school": c.school,
+                "engineer": c.engineer,
+                "research": c.research,
+                "notebook_file": c.notebook_file,
+                "cell_index": c.cell_index,
+                "twin_id": c.twin_id,
+            }
+        )
+    return {**t, "concepts": concepts}
 
 
 @router.get("/risks")

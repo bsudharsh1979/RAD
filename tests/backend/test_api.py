@@ -57,6 +57,7 @@ def test_tutor_course_mode_grounding():
     r = client.post("/api/tutor", json={"content": "What is a HuggingFace pipeline?"}).json()
     assert r["sources"] or "not established" in r["text"].lower()
     assert r["evidence_type"] in {"TUTOR_INTERPRETATION", "COURSE_SOURCE"}
+    assert "what's happening" in r["text"].lower() or "not established" in r["text"].lower()
 
 
 def test_tutor_missing_topic():

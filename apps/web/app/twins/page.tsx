@@ -10,16 +10,21 @@ export default function TwinsIndex() {
     api<any[]>("/twins").then(setRows);
   }, []);
   return (
-    <div className="space-y-4">
-      <h1 className="text-3xl">Digital twins</h1>
-      <p className="text-[#9aa89a]">
-        Web twins share TwinStateEngine with the optional Omniverse bridge. Every number is a simulation unless you import an ACTUAL_RUN.
-      </p>
+    <div className="space-y-5">
+      <header className="max-w-3xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#76b900]">Digital twins</p>
+        <h1 className="mt-2 text-4xl font-semibold">Predict first. Then watch the mechanism.</h1>
+        <p className="mt-3" style={{ color: "var(--muted)" }}>
+          Every number is a simulation unless you import an ACTUAL_RUN. Lock a prediction before you run.
+        </p>
+      </header>
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((t) => (
           <Link key={t.id} href={`/twins/${t.id}`} className="panel block p-4 hover:border-[#76b900]">
-            <h2 className="text-lg">{t.name}</h2>
-            <p className="mt-2 text-sm text-[#9aa89a]">{t.summary}</p>
+            <h2 className="text-lg font-medium">{t.name}</h2>
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+              {t.summary}
+            </p>
             <p className="mt-2 text-xs">{t.notebook_file}</p>
           </Link>
         ))}

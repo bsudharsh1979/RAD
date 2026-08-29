@@ -11,7 +11,7 @@ cd apps/web && npm install && cd ../..
 ./scripts/dev.sh
 ```
 
-Open http://localhost:3000 — choose **Demo**, then Notebook 1 with `?walkthrough=1`.
+Open http://localhost:3000 — start, then open **The model that hides its homework**.
 
 ## Tests
 
@@ -95,8 +95,8 @@ SQLite is pinned to `max_containers=1` plus `@modal.concurrent(max_inputs=100)`.
 
 ## Five-step demo path
 
-1. Home → Demo onboard (no keys).
-2. Notebooks → Lab 1 (`?walkthrough=1`) → play SIMPLE, toggle EXPERT, next/prev/jump, close.
-3. Digital twin **HuggingFace Pipeline** → lock a prediction → run.
-4. Twin **Incident diagnosis** → commit a cause.
-5. Assessment arena → pick ≥3 features → defend inverted toxicity + 13B grader.
+1. Home → start (Demo or NIM) → pick **The model that hides its homework**.
+2. Read the moving parts → Hear the lecture (`?walkthrough=1`) → SIMPLE, then EXPERT.
+3. Run the **HuggingFace Pipeline** twin: lock a prediction, then run.
+4. Tutor: ask “What actually happens between the sentence I type and the [MASK] guess?”
+5. Next story: **Why the chatbot forgot your name** → Incident diagnosis twin → commit a cause.

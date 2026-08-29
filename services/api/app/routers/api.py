@@ -137,15 +137,9 @@ def meta():
             "home",
             "learn",
             "tutor",
-            "concepts",
             "notebooks",
             "twins",
-            "experiments",
-            "practice",
-            "review",
-            "assessment",
-            "progress",
-            "sources",
+            "concepts",
             "risks",
             "settings",
         ],
@@ -229,8 +223,8 @@ def home(user: User = Depends(learner), db: Session = Depends(get_db)):
     avg = sum(s.score for s in states) / len(states) if states else 0.0
     plan = _thirty(db, user, weak)
     resume = user.last_resume_json or {
-        "text": "You have not started a lesson yet. Take the diagnostic or open notebook 1.",
-        "action": "/learn",
+        "text": "Start with the pipeline story: peel the black box before you trust the filled-in blank.",
+        "action": "/learn/the-black-box",
     }
     return {
         "what_i_know": round(avg, 3),
@@ -252,18 +246,37 @@ def home(user: User = Depends(learner), db: Session = Depends(get_db)):
 
 
 def _thirty(db, user, weak) -> list[dict]:
+    from app.domains.topics.catalog import list_topics, topic_for_concept
+
     if not user.onboarded:
-        return [{"title": "Choose APIs / start demo", "href": "/settings", "minutes": 5}]
-    if db.query(QuestionAttempt).filter(QuestionAttempt.user_id == user.id).count() == 0:
-        return [{"title": "Take the adaptive diagnostic", "href": "/practice?mode=diagnostic", "minutes": 12}]
-    items = [{"title": "Reviews due", "href": "/review", "minutes": 8}]
+        return [{"title": "Pick a topic and start", "href": "/learn", "minutes": 5}]
+    items: list[dict] = [
+        {
+            "title": "The model that hides its homework",
+            "href": "/learn/the-black-box",
+            "minutes": 15,
+        }
+    ]
     if weak:
-        items.append({"title": f"Lesson: {weak[0]['name']}", "href": f"/learn?concept={weak[0]['id']}", "minutes": 12})
+        t = topic_for_concept(weak[0]["id"])
+        if t:
+            items.append({"title": t["title"], "href": f"/learn/{t['id']}", "minutes": t["minutes"]})
         c = db.get(Concept, weak[0]["id"])
         if c and c.twin_id:
-            items.append({"title": f"Twin: {c.twin_id}", "href": f"/twins/{c.twin_id}", "minutes": 10})
-    items.append({"title": "Notebook studio", "href": "/notebooks", "minutes": 10})
-    return items[:4]
+            items.append({"title": f"Try the {c.twin_id} twin", "href": f"/twins/{c.twin_id}", "minutes": 10})
+    else:
+        nxt = list_topics()[1]
+        items.append({"title": nxt["title"], "href": f"/learn/{nxt['id']}", "minutes": nxt["minutes"]})
+    items.append({"title": "Ask the tutor a real question", "href": "/tutor", "minutes": 8})
+    # de-dupe by href, keep first
+    seen: set[str] = set()
+    out = []
+    for it in items:
+        if it["href"] in seen:
+            continue
+        seen.add(it["href"])
+        out.append(it)
+    return out[:4]
 
 
 @router.get("/concepts")

@@ -8,15 +8,9 @@ const LINKS = [
   ["Home", "/"],
   ["Learn", "/learn"],
   ["Tutor", "/tutor"],
-  ["Concept Map", "/concepts"],
   ["Notebooks", "/notebooks"],
-  ["Digital Twins", "/twins"],
-  ["Experiments", "/experiments"],
-  ["Practice", "/practice"],
-  ["Review", "/review"],
-  ["Assessment", "/assessment"],
-  ["Progress", "/progress"],
-  ["Sources", "/sources"],
+  ["Twins", "/twins"],
+  ["Concepts", "/concepts"],
   ["Risks", "/risks"],
   ["Settings", "/settings"],
 ];
@@ -34,12 +28,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <Link href="/" className="mb-6 block">
           <div className="text-xs uppercase tracking-[0.2em] text-[#76b900]">LLM Twin Academy</div>
           <div className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-            NVIDIA DLI · RAD / LLMs
+            Ten stories · RAD / LLMs
           </div>
         </Link>
         <nav className="flex flex-col gap-1" aria-label="Main">
           {LINKS.map(([label, href]) => {
-            const active = href === "/" ? path === "/" : path.startsWith(href);
+            const active = href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
             return (
               <Link
                 key={href}
@@ -61,7 +55,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             onChange={(e) => {
               window.location.href = e.target.value;
             }}
-            value={LINKS.find(([, h]) => (h === "/" ? path === "/" : path.startsWith(h)))?.[1] || "/"}
+            value={LINKS.find(([, h]) => (h === "/" ? path === "/" : path === h || path.startsWith(`${h}/`)))?.[1] || "/"}
           >
             {LINKS.map(([l, h]) => (
               <option key={h} value={h}>
@@ -72,7 +66,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </header>
         <header className="flex items-center justify-between border-b px-4 py-3 md:px-8" style={{ borderColor: "var(--line)" }}>
           <span className="hidden text-sm md:inline" style={{ color: "var(--muted)" }}>
-            Source-grounded · evidence-labeled · no silent GPU claims
+            Mechanisms first · evidence-labeled · no silent GPU claims
           </span>
           <button
             className="rounded border px-2 py-1 text-xs"

@@ -30,12 +30,13 @@ class NvidiaNIMProvider(TutorModelProvider):
             "max_tokens": req.max_tokens,
             "temperature": 0.2,
         }
-        with httpx.Client(timeout=90.0) as client:
+        with httpx.Client(timeout=180.0) as client:
             r = client.post(url, json=payload, headers=headers)
             r.raise_for_status()
             data = r.json()
         choice = (data.get("choices") or [{}])[0]
-        text = (choice.get("message") or {}).get("content") or ""
+        msg = choice.get("message") or {}
+        text = (msg.get("content") or msg.get("reasoning_content") or "").strip()
         usage = data.get("usage") or {}
         ms = (time.perf_counter() - t0) * 1000
         return TutorResponse(

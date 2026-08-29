@@ -31,7 +31,9 @@ class Settings(BaseModel):
     nim_base_url: str | None = Field(default_factory=lambda: os.getenv("NIM_BASE_URL"))
     nvidia_api_key: str | None = Field(default_factory=lambda: os.getenv("NVIDIA_API_KEY"))
     nvidia_nim_model: str = Field(
-        default_factory=lambda: os.getenv("NVIDIA_NIM_MODEL", "meta/llama-3.1-8b-instruct")
+        default_factory=lambda: os.getenv(
+            "NVIDIA_NIM_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"
+        )
     )
     huggingface_api_key: str | None = Field(
         default_factory=lambda: os.getenv("HUGGINGFACE_API_KEY")

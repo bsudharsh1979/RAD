@@ -41,6 +41,7 @@ export function WalkthroughPlayer({
   const [err, setErr] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const finishTimes = useRef<number[]>([]);
   const cacheKey = useRef<string>("");
 
@@ -74,21 +75,42 @@ export function WalkthroughPlayer({
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
     utterRef.current = null;
   }, []);
 
   const speak = useCallback(
-    (text: string, onEnd: () => void) => {
-      api("/voice/tts", {
-        method: "POST",
-        body: JSON.stringify({ text, provider: "auto", clip: false, language: "en" }),
-      }).catch(() => undefined);
+    async (text: string, onEnd: () => void) => {
+      stopVoice();
+      try {
+        const r: any = await api("/voice/tts", {
+          method: "POST",
+          body: JSON.stringify({ text, provider: "auto", clip: false, language: "en" }),
+        });
+        if (r?.audio_b64) {
+          const a = new Audio(`data:${r.mime || "audio/mpeg"};base64,${r.audio_b64}`);
+          a.playbackRate = speed;
+          a.onended = () => onEnd();
+          a.onerror = () => {
+            setUnavailable(true);
+            setPlaying(false);
+          };
+          audioRef.current = a;
+          await a.play();
+          return;
+        }
+      } catch {
+        /* fall through to browser voice */
+      }
       if (!window.speechSynthesis) {
         setUnavailable(true);
         setPlaying(false);
         return;
       }
-      stopVoice();
       const u = new SpeechSynthesisUtterance(text);
       u.rate = Math.max(0.6, Math.min(1.6, 0.93 * speed));
       const started = Date.now();
@@ -128,7 +150,7 @@ export function WalkthroughPlayer({
 
   useEffect(() => {
     if (!playing || !step || unavailable) return;
-    speak(step.narration, () => {
+    void speak(step.narration, () => {
       if (idx < (data?.steps.length || 1) - 1) {
         setIdx((i) => i + 1);
       } else {

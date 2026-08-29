@@ -1,0 +1,16 @@
+{
+  "source": "learner-imported demo fixture",
+  "model": "bert-base-uncased",
+  "task": "fill-mask",
+  "gpu": "none-demo",
+  "gpu_count": 0,
+  "precision": "fp32",
+  "isl": 8,
+  "osl": 1,
+  "concurrency": 1,
+  "warmup": false,
+  "cache_state": "cold",
+  "latency_ms": 12.4,
+  "throughput": 80,
+  "note": "Example JSON for the importer. Label remains ACTUAL_RUN of THIS file, not of the NVIDIA notebooks."
+}

@@ -41,7 +41,7 @@ image = modal.Image.from_registry("node:22-bookworm-slim", add_python="3.12").ru
 )
 if ROOT is not None:
     image = (
-        image.add_local_dir(str(ROOT / "apps" / "web"), remote_path="/web")
+        image.add_local_dir(str(ROOT / "apps" / "web"), remote_path="/web", copy=True)
         .env(
             {
                 "NEXT_PUBLIC_API_BASE": API_BASE,

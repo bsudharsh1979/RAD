@@ -17,6 +17,7 @@ const LINKS = [
   ["Assessment", "/assessment"],
   ["Progress", "/progress"],
   ["Sources", "/sources"],
+  ["Risks", "/risks"],
   ["Settings", "/settings"],
 ];
 
@@ -83,6 +84,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </button>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+        <footer className="border-t px-4 py-3 text-[11px] md:px-8" style={{ borderColor: "var(--line)", color: "var(--muted)" }}>
+          Not affiliated with or endorsed by NVIDIA. <code>course-materials/</code> is bring-your-own, personal-use
+          licensed content. Lectures and twins are our own words and simulations — never executed notebooks.
+        </footer>
       </div>
     </div>
   );

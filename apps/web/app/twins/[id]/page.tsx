@@ -87,6 +87,20 @@ export default function TwinPage() {
               </span>
             </label>
           ))}
+          {(meta.suggested || []).length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.15em] text-[#76b900]">Suggested scenarios</p>
+              {(meta.suggested || []).map((s: any) => (
+                <button
+                  key={s.name}
+                  className="mr-1 rounded border px-2 py-1 text-xs"
+                  onClick={() => setParams({ ...params, ...s.params })}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
           <textarea className="field" placeholder="Your prediction" value={pred} onChange={(e) => setPred(e.target.value)} />
           <button
             className="w-full rounded border border-[#76b900] px-3 py-2"

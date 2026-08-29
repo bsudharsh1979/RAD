@@ -89,7 +89,7 @@ def test_compare_detects_confounders():
 
 def test_question_bank_size_and_provenance():
     qs = all_questions()
-    assert len(qs) >= 150
+    assert len(qs) >= 500
     missing = [q for q in qs if not q.get("source_file")]
     assert not missing
     types = {q["qtype"] for q in qs}
@@ -98,7 +98,7 @@ def test_question_bank_size_and_provenance():
 
 
 def test_concepts_seeded():
-    assert len(CONCEPTS) >= 40
+    assert len(CONCEPTS) >= 90
     slugs = [c["slug"] for c in CONCEPTS]
     assert "huggingface-pipeline" in slugs
     assert "rag" in slugs

@@ -27,6 +27,10 @@ First screen asks **which APIs you want**. Choose **Demo** to stay offline. Then
 
 `docker compose up` is the PostgreSQL + pgvector path when Docker is available.
 
+## Modal
+
+See `docs/LAUNCH.md`. Apps: `llm-twin-academy-api` and `llm-twin-academy-web`. Keep `MODAL_MIN_CONTAINERS=0` after the first live check.
+
 ## Architecture
 
 ```mermaid

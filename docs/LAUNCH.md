@@ -22,9 +22,19 @@ cd apps/web && npm run lint && npm run build
 
 ## Modal (live)
 
-Profile: the authenticated Modal CLI profile on the machine that deploys.
+Profile: `gamgn` (the authenticated Modal CLI profile on the machine that deploys).
 
 App names: `llm-twin-academy-api` and `llm-twin-academy-web`.
+
+Current deployment:
+
+- **API:** https://gamgn--llm-twin-academy-api-fastapi-app.modal.run
+- **Web:** https://gamgn--llm-twin-academy-web-web.modal.run
+- Dashboards: [API](https://modal.com/apps/gamgn/main/deployed/llm-twin-academy-api) · [Web](https://modal.com/apps/gamgn/main/deployed/llm-twin-academy-web)
+
+The Next.js image bakes `NEXT_PUBLIC_API_BASE` at build time. Redeploy web whenever the API URL changes.
+
+Keep `MODAL_MIN_CONTAINERS=0` after the first live check so both apps stay inside the Modal $30 credit. Cold start is expected.
 
 Create an empty-ok secret once:
 

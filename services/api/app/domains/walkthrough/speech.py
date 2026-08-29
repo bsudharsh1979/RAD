@@ -9,7 +9,7 @@ DOUBLE_PUNCT = re.compile(r"\?\.")
 N_OF_N = re.compile(r"\b(\d+)\s*/\s*(\d+)\b")
 ARROW = re.compile(r"\s*(→|->|⇒)\s*")
 EQUALS = re.compile(r"\s*=\s*")
-SLASH_OR = re.compile(r"(?<=[A-Za-z])/(?=[A-Za-z])")
+SLASH_OR = re.compile(r"(?<=[A-Za-z0-9])/(?=[A-Za-z0-9])")
 
 
 def humanize_title(title: str) -> str:

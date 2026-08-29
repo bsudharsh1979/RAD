@@ -28,7 +28,8 @@ def _finite(x: float, fallback: float = 0.0) -> float:
 def sanitize(state: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for k, v in state.items():
-        if isinstance(v, float):
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            v = float(v)
             if math.isnan(v) or math.isinf(v):
                 v = 0.0
             if "util" in k or "rate" in k or "hit" in k:
@@ -83,7 +84,8 @@ def pipeline_flow(p: dict[str, Any]) -> dict[str, Any]:
 
 
 def tokenizer_embeddings(p: dict[str, Any]) -> dict[str, Any]:
-    seq = max(1, min(512, int(p.get("seq_len", 12))))
+    requested = max(1, int(p.get("seq_len", 12)))
+    seq = min(512, requested)
     use_type = bool(p.get("sentence_pair", False))
     dim = 768
     vocab = 30522
@@ -92,7 +94,8 @@ def tokenizer_embeddings(p: dict[str, Any]) -> dict[str, Any]:
     return {
         "scenario": "tokenizer-embeddings",
         "seq_len": seq,
-        "over_limit": seq > 512,
+        "requested_seq_len": requested,
+        "over_limit": requested > 512,
         "input_ids": list(range(seq)),
         "token_type_ids": ([0] * (seq // 2) + [1] * (seq - seq // 2)) if use_type else [0] * seq,
         "word_table": [vocab, dim],

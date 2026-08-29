@@ -518,10 +518,19 @@ def twins_predict(body: PredictIn, user: User = Depends(learner), db: Session = 
 
 @router.get("/lessons/{concept_id}")
 def lesson(concept_id: str, db: Session = Depends(get_db)):
-    les = db.query(Lesson).filter(Lesson.concept_id == concept_id).one_or_none()
+    les = (
+        db.get(Lesson, concept_id)
+        or db.query(Lesson).filter(Lesson.concept_id == concept_id).one_or_none()
+    )
     if not les:
         raise HTTPException(404)
-    return {"id": les.id, "title": les.title, "steps": les.steps, "hide_outcome_until_predict": True}
+    return {
+        "id": les.id,
+        "concept_id": les.concept_id,
+        "title": les.title,
+        "steps": les.steps,
+        "hide_outcome_until_predict": True,
+    }
 
 
 DIAGNOSTIC_CONCEPTS = [

@@ -29,7 +29,7 @@ export function WalkthroughPlayer({
   autoOpen = false,
 }: {
   notebookId: string;
-  onRange?: (start: number, end: number) | null | ((s: number, e: number) => void);
+  onRange?: (start: number, end: number) => void;
   autoOpen?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);

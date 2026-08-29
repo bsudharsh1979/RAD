@@ -413,9 +413,10 @@ def test_tutor_teaches_pipeline_mechanism():
     r = client.post("/api/tutor", json={"content": "What actually happens inside a HuggingFace pipeline?"}).json()
     text = r["text"].lower()
     assert "what's happening" in text
+    assert "huggingface pipeline" in text
     assert "depth:" not in text
     assert "likely concepts" not in text
-    assert "preprocess" in text or "tokenizer" in text or "pipeline" in text
+    assert "preprocess" in text or "tokenizer" in text or "end-to-end" in text
     assert r["sources"]
 
 

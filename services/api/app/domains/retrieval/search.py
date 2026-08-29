@@ -74,10 +74,21 @@ def hybrid_search(
 
 def match_concepts(db: Session, query: str, limit: int = 5) -> list[Concept]:
     qvec = hash_embedding(query)
+    qlow = query.lower()
     ranked: list[tuple[float, Concept]] = []
     for c in db.query(Concept).all():
-        blob = " ".join([c.name, c.definition, c.engineer, c.slug.replace("-", " ")])
+        blob = " ".join([c.name, c.definition, c.engineer, c.analogy or "", c.slug.replace("-", " ")])
         s = 0.7 * lexical_score(query, blob) + 0.3 * cosine(qvec, hash_embedding(blob))
+        name = (c.name or "").lower()
+        slug = (c.slug or "").replace("-", " ")
+        if name and name in qlow:
+            s += 0.5
+        elif slug and slug in qlow:
+            s += 0.35
+        else:
+            words = [w for w in name.split() if len(w) > 3]
+            if words and all(w in qlow for w in words):
+                s += 0.25
         ranked.append((s, c))
     ranked.sort(key=lambda t: t[0], reverse=True)
     return [c for s, c in ranked[:limit] if s > 0.02]

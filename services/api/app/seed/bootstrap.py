@@ -36,8 +36,27 @@ ACTIVE_STEPS = [
 ]
 
 
+def _ensure_columns() -> None:
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    alters: list[tuple[str, str, str]] = [
+        ("concepts", "analogy", "ALTER TABLE concepts ADD COLUMN analogy TEXT DEFAULT ''"),
+        ("notebook_cells", "business_impact", "ALTER TABLE notebook_cells ADD COLUMN business_impact TEXT DEFAULT ''"),
+    ]
+    with engine.begin() as conn:
+        for table, col, sql in alters:
+            if table not in tables:
+                continue
+            cols = {c["name"] for c in inspect(engine).get_columns(table)}
+            if col not in cols:
+                conn.execute(text(sql))
+
+
 def init_db_and_seed() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
     from app.db.session import SessionLocal
 
     db = SessionLocal()
@@ -64,44 +83,51 @@ def _seed(db: Session) -> None:
 
     ingest_course_materials(db)
 
-    if db.query(Concept).count() == 0:
-        for c in CONCEPTS:
-            db.add(
-                Concept(
-                    id=c["id"],
-                    slug=c["slug"],
-                    name=c["name"],
-                    cluster=c["cluster"],
-                    definition=c["definition"],
-                    school=c["school"],
-                    engineer=c["engineer"],
-                    research=c["research"],
-                    notebook_file=c.get("notebook_file"),
-                    cell_index=c.get("cell_index"),
-                    twin_id=c.get("twin_id"),
-                    common_misconceptions=[],
+    existing_concepts = {c.id for c in db.query(Concept).all()}
+    for c in CONCEPTS:
+        if c["id"] in existing_concepts:
+            row = db.get(Concept, c["id"])
+            if row and not (row.analogy or "").strip():
+                row.analogy = c.get("analogy") or (
+                    c["school"].split(".")[0] + " — like a labeled drawer in a filing cabinet."
                 )
+            continue
+        db.add(
+            Concept(
+                id=c["id"],
+                slug=c["slug"],
+                name=c["name"],
+                cluster=c["cluster"],
+                definition=c["definition"],
+                school=c["school"],
+                engineer=c["engineer"],
+                research=c["research"],
+                analogy=c.get("analogy")
+                or (c["school"].split(".")[0] + " — like a labeled drawer in a filing cabinet."),
+                notebook_file=c.get("notebook_file"),
+                cell_index=c.get("cell_index"),
+                twin_id=c.get("twin_id"),
+                common_misconceptions=[],
             )
-        db.flush()
-        for i, (s, d, rel) in enumerate(EDGES):
-            db.add(
-                ConceptEdge(
-                    id=f"e-{i}-{s}-{d}"[:64],
-                    src_id=s,
-                    dst_id=d,
-                    relation=rel,
-                )
+        )
+        db.add(
+            Lesson(
+                id="les-" + c["id"],
+                concept_id=c["id"],
+                title=c["name"],
+                steps=[{"name": st, "prompt": f"{st} · {c['name']}"} for st in ACTIVE_STEPS],
             )
-        db.flush()
-        for c in CONCEPTS:
-            db.add(
-                Lesson(
-                    id="les-" + c["id"],
-                    concept_id=c["id"],
-                    title=c["name"],
-                    steps=[{"name": st, "prompt": f"{st} · {c['name']}"} for st in ACTIVE_STEPS],
-                )
-            )
+        )
+    db.flush()
+    have_edges = {e.id for e in db.query(ConceptEdge).all()}
+    for i, (s, d, rel) in enumerate(EDGES):
+        eid = f"e-{i}-{s}-{d}"[:64]
+        if eid in have_edges:
+            continue
+        if not db.get(Concept, s) or not db.get(Concept, d):
+            continue
+        db.add(ConceptEdge(id=eid, src_id=s, dst_id=d, relation=rel))
+    db.flush()
 
     if db.query(Misconception).count() == 0:
         for m in MISCONCEPTIONS:
@@ -120,8 +146,11 @@ def _seed(db: Session) -> None:
                 )
             )
 
-    if db.query(Question).count() == 0:
+    if db.query(Question).count() < 500:
+        have_q = {q.id for q in db.query(Question).all()}
         for q in all_questions():
+            if q["id"] in have_q:
+                continue
             db.add(
                 Question(
                     id=q["id"],
@@ -142,8 +171,9 @@ def _seed(db: Session) -> None:
                 )
             )
 
-    if db.query(DigitalTwin).count() == 0:
-        for t in TWIN_CATALOG:
+    have_twins = {t.id for t in db.query(DigitalTwin).all()}
+    for t in TWIN_CATALOG:
+        if t["id"] not in have_twins:
             db.add(
                 DigitalTwin(
                     id=t["id"],
@@ -155,12 +185,19 @@ def _seed(db: Session) -> None:
                 )
             )
             db.flush()
+        suggestions = t.get("suggested") or [
+            {"name": "Default", "params": {c["key"]: c.get("default") for c in t["controls"]}}
+        ]
+        for i, scn in enumerate(suggestions[:4]):
+            sid = f"scn-{t['id']}-{i}"
+            if db.get(TwinScenario, sid):
+                continue
             db.add(
                 TwinScenario(
-                    id="scn-" + t["id"],
+                    id=sid,
                     twin_id=t["id"],
-                    name="Default",
-                    params={c["key"]: c.get("default") for c in t["controls"]},
+                    name=scn.get("name") or f"Scenario {i+1}",
+                    params=scn.get("params") or {},
                     teaching_point=t["summary"],
                 )
             )

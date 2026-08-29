@@ -1,8 +1,3 @@
-"""Shared TwinStateEngine (imported by API and Omniverse bridge)."""
+"""Backward-compatible import path used by the Omniverse bridge."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api"))
-
-from app.domains.twins.engine import SCENARIOS, TWIN_CATALOG, run, sanitize  # noqa: E402,F401
+from twin_engine.engine import SCENARIOS, SUGGESTED, TWIN_CATALOG, run, sanitize  # noqa: F401

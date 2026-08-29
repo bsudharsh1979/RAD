@@ -146,6 +146,7 @@ def meta():
             "assessment",
             "progress",
             "sources",
+            "risks",
             "settings",
         ],
     }
@@ -277,6 +278,7 @@ def concepts(db: Session = Depends(get_db)):
                 "name": n.name,
                 "cluster": n.cluster,
                 "definition": n.definition,
+                "analogy": n.analogy,
                 "school": n.school,
                 "engineer": n.engineer,
                 "research": n.research,
@@ -309,6 +311,7 @@ def concept_one(cid: str, user: User = Depends(learner), db: Session = Depends(g
             "name": c.name,
             "slug": c.slug,
             "definition": c.definition,
+            "analogy": c.analogy,
             "school": c.school,
             "engineer": c.engineer,
             "research": c.research,
@@ -353,7 +356,11 @@ def notebook_one(nid: str, db: Session = Depends(get_db)):
     if not n:
         n = db.query(Notebook).filter(Notebook.filename == nid).one_or_none()
     if not n:
-        raise HTTPException(404)
+        raise HTTPException(
+            404,
+            "unknown notebook — Modal / SQLite ids are sha1(path); this id is stale after a rebuild, "
+            "or the filename fallback did not match. Refresh /api/notebooks.",
+        )
     cells = (
         db.query(NotebookCell)
         .filter(NotebookCell.notebook_id == n.id)
@@ -393,6 +400,7 @@ def _cell(c: NotebookCell) -> dict:
             "HOW_TO_VERIFY": c.how_to_verify,
             "COMMON_FAILURE": c.common_failure,
             "TRY_MODIFYING": c.try_modifying,
+            "BUSINESS_IMPACT": c.business_impact,
         },
         "span_id": c.span_id,
         "evidence_type": "COURSE_SOURCE",
@@ -421,7 +429,11 @@ def source_one(sid: str, db: Session = Depends(get_db)):
     if not a:
         a = db.query(SourceArtifact).filter(SourceArtifact.filename == sid).one_or_none()
     if not a:
-        raise HTTPException(404)
+        raise HTTPException(
+            404,
+            "unknown source — ids are sha1(path) and survive only while the same relative path is ingested. "
+            "Refresh /api/sources or retry by filename.",
+        )
     spans = db.query(SourceSpan).filter(SourceSpan.artifact_id == a.id).all()
     return {
         "artifact": {"id": a.id, "file": a.filename, "type": a.source_type, "title": a.title},
@@ -1051,22 +1063,17 @@ def diagnostic_complete(body: DiagCompleteIn, user: User = Depends(learner), db:
 
 class VoiceIn(BaseModel):
     text: str
+    provider: str = "auto"
+    language: str = "en"
+    clip: bool = False
     interrupt: bool = False
 
 
 @router.post("/voice/tts")
-def voice_tts(body: VoiceIn, user: User = Depends(learner)):
-    if user.voice_provider in (None, "none"):
-        return {"ok": False, "reason": "Voice is optional and currently off."}
-    p = VOICE.get(user.voice_provider)
-    if not p or not p.available():
-        return {"ok": False, "reason": f"{user.voice_provider} not configured", "interrupted": body.interrupt}
-    return {
-        "ok": False,
-        "reason": "Keys present but TTS bytes are not fetched in demo to avoid surprise cost.",
-        "interrupted": body.interrupt,
-        "transcript_echo": body.text[:200],
-    }
+def voice_tts(body: VoiceIn):
+    from app.domains.voice.service import synthesize
+
+    return synthesize(body.text, provider=body.provider, language=body.language, clip=body.clip)
 
 
 @router.get("/omniverse/status")

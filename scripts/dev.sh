@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export PYTHONPATH="$ROOT/services/api"
+export PYTHONPATH="$ROOT/services/api:$ROOT/services/twin-engine"
 export COURSE_MATERIALS_DIR="$ROOT/course-materials"
 export DATABASE_URL="${DATABASE_URL:-sqlite:///$ROOT/data/academy.db}"
 mkdir -p "$ROOT/data"

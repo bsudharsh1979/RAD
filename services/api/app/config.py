@@ -63,6 +63,12 @@ class Settings(BaseModel):
     cors_origins: str = Field(
         default_factory=lambda: os.getenv("CORS_ORIGINS", "http://localhost:3000")
     )
+    cors_origin_regex: str = Field(
+        default_factory=lambda: os.getenv(
+            "CORS_ORIGIN_REGEX",
+            r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://.*\.modal\.run$|^https://.*\.vercel\.app$",
+        )
+    )
     demo_learner_id: str = "demo-learner"
     embedding_dim: int = 256
     monthly_budget_usd: float = Field(

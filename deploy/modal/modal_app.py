@@ -7,25 +7,34 @@ from pathlib import Path
 
 import modal
 
-ROOT = Path(__file__).resolve().parents[2]
 
-image = (
-    modal.Image.debian_slim(python_version="3.12")
-    .pip_install(
-        "fastapi==0.115.6",
-        "uvicorn[standard]==0.32.1",
-        "sqlalchemy==2.0.36",
-        "pydantic==2.10.3",
-        "nbformat==5.10.4",
-        "python-multipart==0.0.19",
-        "httpx==0.28.1",
-        "numpy==2.2.1",
-        "alembic==1.14.0",
-    )
-    .add_local_dir(str(ROOT / "services" / "api"), remote_path="/root/api")
-    .add_local_dir(str(ROOT / "services" / "twin-engine"), remote_path="/root/twin-engine")
-    .add_local_dir(str(ROOT / "course-materials"), remote_path="/root/course-materials")
+def _repo_root() -> Path | None:
+    here = Path(__file__).resolve()
+    for p in (here.parent, *here.parents):
+        if (p / "services" / "api").is_dir() and (p / "course-materials").is_dir():
+            return p
+    return None
+
+
+ROOT = _repo_root()
+
+image = modal.Image.debian_slim(python_version="3.12").pip_install(
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "sqlalchemy==2.0.36",
+    "pydantic==2.10.3",
+    "nbformat==5.10.4",
+    "python-multipart==0.0.19",
+    "httpx==0.28.1",
+    "numpy==2.2.1",
+    "alembic==1.14.0",
 )
+if ROOT is not None:
+    image = (
+        image.add_local_dir(str(ROOT / "services" / "api"), remote_path="/root/api")
+        .add_local_dir(str(ROOT / "services" / "twin-engine"), remote_path="/root/twin-engine")
+        .add_local_dir(str(ROOT / "course-materials"), remote_path="/root/course-materials")
+    )
 
 app = modal.App("llm-twin-academy-api", image=image)
 

@@ -7,7 +7,16 @@ from pathlib import Path
 
 import modal
 
-ROOT = Path(__file__).resolve().parents[2]
+
+def _repo_root() -> Path | None:
+    here = Path(__file__).resolve()
+    for p in (here.parent, *here.parents):
+        if (p / "apps" / "web").is_dir():
+            return p
+    return None
+
+
+ROOT = _repo_root()
 API_BASE = os.environ.get("NEXT_PUBLIC_API_BASE", "").rstrip("/")
 
 _BUILD = r"""
@@ -27,21 +36,21 @@ cp -a /web/.next/static /web/.next/standalone/.next/static
 if [ -d /web/public ]; then cp -a /web/public /web/.next/standalone/public; fi
 """
 
-image = (
-    modal.Image.from_registry("node:22-bookworm-slim", add_python="3.12")
-    .run_commands(
-        "apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*"
-    )
-    .add_local_dir(str(ROOT / "apps" / "web"), remote_path="/web")
-    .env(
-        {
-            "NEXT_PUBLIC_API_BASE": API_BASE,
-            "MODAL_WEB_BUILD": "1",
-            "NEXT_TELEMETRY_DISABLED": "1",
-        }
-    )
-    .run_commands(_BUILD)
+image = modal.Image.from_registry("node:22-bookworm-slim", add_python="3.12").run_commands(
+    "apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*"
 )
+if ROOT is not None:
+    image = (
+        image.add_local_dir(str(ROOT / "apps" / "web"), remote_path="/web")
+        .env(
+            {
+                "NEXT_PUBLIC_API_BASE": API_BASE,
+                "MODAL_WEB_BUILD": "1",
+                "NEXT_TELEMETRY_DISABLED": "1",
+            }
+        )
+        .run_commands(_BUILD)
+    )
 
 app = modal.App("llm-twin-academy-web", image=image)
 

@@ -19,29 +19,13 @@ def _repo_root() -> Path | None:
 ROOT = _repo_root()
 API_BASE = os.environ.get("NEXT_PUBLIC_API_BASE", "").rstrip("/")
 
-_BUILD = r"""
-set -euo pipefail
-if [ -z "${NEXT_PUBLIC_API_BASE:-}" ]; then
-  echo "NEXT_PUBLIC_API_BASE must be set to bake the Next standalone build." >&2
-  echo "Deploy the API first, then:" >&2
-  echo "  NEXT_PUBLIC_API_BASE=<api URL> MODAL_MIN_CONTAINERS=0 modal deploy deploy/modal/modal_web.py" >&2
-  exit 1
-fi
-cd /web
-npm ci
-export MODAL_WEB_BUILD=1 NEXT_TELEMETRY_DISABLED=1
-npm run build
-mkdir -p /web/.next/standalone/.next
-cp -a /web/.next/static /web/.next/standalone/.next/static
-if [ -d /web/public ]; then cp -a /web/public /web/.next/standalone/public; fi
-"""
-
 image = modal.Image.from_registry("node:22-bookworm-slim", add_python="3.12").run_commands(
     "apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*"
 )
 if ROOT is not None:
     image = (
         image.add_local_dir(str(ROOT / "apps" / "web"), remote_path="/web", copy=True)
+        .add_local_file(str(ROOT / "deploy" / "modal" / "build_web.sh"), remote_path="/build_web.sh", copy=True)
         .env(
             {
                 "NEXT_PUBLIC_API_BASE": API_BASE,
@@ -49,7 +33,7 @@ if ROOT is not None:
                 "NEXT_TELEMETRY_DISABLED": "1",
             }
         )
-        .run_commands(_BUILD)
+        .run_commands("bash /build_web.sh")
     )
 
 app = modal.App("llm-twin-academy-web", image=image)

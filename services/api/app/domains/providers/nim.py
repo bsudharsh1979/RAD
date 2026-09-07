@@ -24,12 +24,14 @@ class NvidiaNIMProvider(TutorModelProvider):
             "Authorization": f"Bearer {settings.nvidia_api_key}",
             "Content-Type": "application/json",
         }
+        # integrate.api.nvidia.com rejects OpenAI-SDK `extra_body`. Pass the
+        # Nemotron thinking switch as a top-level chat_template_kwargs field.
         payload = {
             "model": settings.nvidia_nim_model,
             "messages": messages,
             "max_tokens": req.max_tokens,
             "temperature": 0.2,
-            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         with httpx.Client(timeout=180.0) as client:
             r = client.post(url, json=payload, headers=headers)
